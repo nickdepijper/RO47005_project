@@ -12,8 +12,6 @@ import numpy as np
 import pybullet as p
 import pybullet_data
 import gymnasium as gym
-from pybullet_envs.deep_mimic.env.testLaikago import startPos
-
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ImageType
 import Environment.environment_classes as env
 
@@ -986,7 +984,7 @@ class BaseAviary(gym.Env):
         goal_position[0] = 0.5 * world_size[0]
 
         environment_description = env.WorldDescription(world_size=world_size,
-                                                       n_obstacles=10,
+                                                       n_obstacles=20,
                                                        obstacle_size_array=np.array([0.05, 0.1,0.15]),
                                                        startpos=start_position,
                                                        goalpos=goal_position)
@@ -994,6 +992,7 @@ class BaseAviary(gym.Env):
         environment_description.generate_world_description()
 
         obstacle_ids = np.zeros(environment_description.n_obstacles).astype(int)  # Store references to obstacles in array
+        print(len(environment_description.obstacles))
         for i in range(environment_description.n_obstacles):
             # Generate an obstacle of specified shape in a random place in the world
             current_obstacle = environment_description.obstacles[i]
@@ -1033,7 +1032,7 @@ class BaseAviary(gym.Env):
             )
 
             # Create a green marker at the end position of the drone
-            send_marker_id = p.createVisualShape(p.GEOM_SPHERE,
+            end_marker_id = p.createVisualShape(p.GEOM_SPHERE,
                                                   radius=0.05,
                                                   visualFramePosition=[0, 0, 0],
                                                   rgbaColor=[0, 1, 0, 0.5],
@@ -1041,8 +1040,8 @@ class BaseAviary(gym.Env):
 
             p.createMultiBody(
                 baseMass=0,  # Mass 0 makes it static
-                baseVisualShapeIndex=start_marker_id,
-                basePosition=start_position,  # Position in the world
+                baseVisualShapeIndex=end_marker_id,
+                basePosition=goal_position,  # Position in the world
                 baseOrientation=p.getQuaternionFromEuler([0, 0, 0])
             )
 

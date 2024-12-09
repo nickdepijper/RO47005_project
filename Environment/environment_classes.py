@@ -11,12 +11,12 @@ class WorldDescription:
         self.goalpos = goalpos
 
     def generate_world_description(self):
-        if len(self.obstacles) != 0:
+        if len(self.obstacles) == 0:
             self.generate_static_obstacles()
 
     def generate_static_obstacles(self):
-        staticpath = self.generate_valid_position()
         for i in range(self.n_obstacles):
+            staticpath = self.generate_valid_position()
             obstacle = ObstacleDescription(shape="sphere",
                                            size_array=self.obstacle_size_array,
                                            path_description=PathDescription(start_pos=staticpath,
