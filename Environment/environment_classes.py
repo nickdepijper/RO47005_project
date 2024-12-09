@@ -2,23 +2,45 @@ import numpy as np
 
 class WorldDescription:
     "A description of the world in terms of its size, the obstacles in it, and the start and goal positions"
-    def __init__(self):
-        self.world_size = 0
-        self.objects = []
-        self.startpos = ()
-        self.goalpos = ()
+    def __init__(self, world_size, n_obstacles, obstacle_size_array, startpos, goalpos):
+        self.world_size = world_size
+        self.n_obstacles = n_obstacles
+        self.obstacles = []
+        self.obstacle_size_array = obstacle_size_array
+        self.startpos = startpos
+        self.goalpos = goalpos
+
+    def generate_world_description(self):
+        if len(self.obstacles) != 0:
+            self.generate_static_obstacles()
+
+    def generate_static_obstacles(self):
+        staticpath = self.generate_valid_position()
+        for i in range(self.n_obstacles):
+            obstacle = ObstacleDescription(shape="sphere",
+                                           size_array=self.obstacle_size_array,
+                                           path_description=PathDescription(start_pos=staticpath,
+                                                                            end_pos=staticpath,
+                                                                            n_timesteps=1))
+            self.obstacles.append(obstacle)
+
+    def generate_valid_position(self):
+        """Generates a position within the world boundaries"""
+        return np.random.rand(3)*self.world_size - [0.5, 0.5, 0] * self.world_size
+
 
     def update_positions(self):
         """Updates all object positions for the next simulation timestep"""
-        return None
+        for obstacle in self.obstacles:
+            obstacle.update_position()
 
 
 class ObstacleDescription:
     """A description used to build an obstacle in pybullet"""
-    def __init__(self, shape, path_description, sphere_size_array):
+    def __init__(self, shape, path_description, size_array):
         self.shape = shape
         self.geometric_description = None
-        self.generate_geometric_description(sphere_size_array)
+        self.generate_geometric_description(size_array)
         self.path_description = path_description
         self.path = path_description.generate_3d_path()
         self.current_position_index = 0
@@ -27,7 +49,7 @@ class ObstacleDescription:
         self.move_forward = True
 
     def generate_geometric_description(self, sphere_size_array):
-        """Generates a description of the geometric object in terms of its shape, position and size"""
+        """Generates a description of the geometric object in terms of its shape and size"""
         if self.shape == "sphere":
             r = np.random.choice(sphere_size_array)
             self.geometric_description = {"shape_type" : self.shape, "radius" : r}

@@ -12,7 +12,10 @@ import numpy as np
 import pybullet as p
 import pybullet_data
 import gymnasium as gym
+from pybullet_envs.deep_mimic.env.testLaikago import startPos
+
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ImageType
+import Environment.environment_classes as env
 
 
 class BaseAviary(gym.Env):
@@ -502,7 +505,7 @@ class BaseAviary(gym.Env):
         # for i in range(self.NUM_DRONES):
             # p.setCollisionFilterPair(bodyUniqueIdA=self.PLANE_ID, bodyUniqueIdB=self.DRONE_IDS[i], linkIndexA=-1, linkIndexB=-1, enableCollision=0, physicsClientId=self.CLIENT)
         if self.OBSTACLES:
-            self._generate_course()
+            self._generate_environment()
     
     ################################################################################
 
@@ -970,11 +973,81 @@ class BaseAviary(gym.Env):
     ################################################################################
 
 
-    def _generate_course(self):
+    def _generate_environment(self):
         """Add obstacles to the environment.
         Obstacles are loaded from standard URDF files included in Bullet or generated from functions
         """
+        world_size = np.array([3, 3, 1])
 
+        start_position = (np.random.rand(3) * world_size - [0.5, 0.5, 0] * world_size) * 0.5
+        start_position[0] = -0.5 * world_size[0]
+
+        goal_position = (np.random.rand(3) * world_size - [0.5, 0.5, 0] * world_size) * 0.5
+        goal_position[0] = 0.5 * world_size[0]
+
+        environment_description = env.WorldDescription(world_size=world_size,
+                                                       n_obstacles=10,
+                                                       obstacle_size_array=np.array([0.05, 0.1,0.15]),
+                                                       startpos=start_position,
+                                                       goalpos=goal_position)
+
+        environment_description.generate_world_description()
+
+        obstacle_ids = np.zeros(environment_description.n_obstacles).astype(int)  # Store references to obstacles in array
+        for i in range(environment_description.n_obstacles):
+            # Generate an obstacle of specified shape in a random place in the world
+            current_obstacle = environment_description.obstacles[i]
+
+            position = current_obstacle.current_position
+
+            if current_obstacle.shape == "sphere":
+                collision_shape = p.createCollisionShape(p.GEOM_SPHERE,
+                                                         radius=current_obstacle.geometric_description["radius"])
+            obstacle_ids[i] = p.createMultiBody(
+            baseMass=0,  # Setting mass to 0 disables physics (but not collisions)
+            baseCollisionShapeIndex=collision_shape,
+            basePosition=position,
+            baseOrientation=p.getQuaternionFromEuler([0, 0, 0]),
+            physicsClientId=self.CLIENT
+            )
+
+            # Set colour of current obstacle to grey
+            p.changeVisualShape(
+                obstacle_ids[i],
+               -1,  # Link index (-1 for base)
+                rgbaColor=[0.3, 0.3, 0.3, 1]  # RGBA
+            )
+
+            # Create a red marker at the start position of the drone
+            start_marker_id = p.createVisualShape(p.GEOM_SPHERE,
+                                                  radius=0.05,
+                                                  visualFramePosition=[0, 0, 0],
+                                                  rgbaColor=[1, 0, 0, 0.5],
+                                                  )
+
+            p.createMultiBody(
+                baseMass=0,  # Mass 0 makes it static
+                baseVisualShapeIndex=start_marker_id,
+                basePosition=start_position,  # Position in the world
+                baseOrientation=p.getQuaternionFromEuler([0, 0, 0])
+            )
+
+            # Create a green marker at the end position of the drone
+            send_marker_id = p.createVisualShape(p.GEOM_SPHERE,
+                                                  radius=0.05,
+                                                  visualFramePosition=[0, 0, 0],
+                                                  rgbaColor=[0, 1, 0, 0.5],
+                                                  )
+
+            p.createMultiBody(
+                baseMass=0,  # Mass 0 makes it static
+                baseVisualShapeIndex=start_marker_id,
+                basePosition=start_position,  # Position in the world
+                baseOrientation=p.getQuaternionFromEuler([0, 0, 0])
+            )
+
+        """
+        # legacy code. DO NOT REMOVE -max
         # Initialise obstacles / arena parameters
         n_objects = 20 # Amount of obstacles to add
         world_size = np.array([3, 3, 1]) # World size. Box of size x, y, z centered on (0,0)
@@ -1032,7 +1105,7 @@ class BaseAviary(gym.Env):
             basePosition=start_position,  # Position in the world
             baseOrientation=p.getQuaternionFromEuler([0, 0, 0])
         )
-
+        """
     ################################################################################
 
     def _parseURDFParameters(self):
