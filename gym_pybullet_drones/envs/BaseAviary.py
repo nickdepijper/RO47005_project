@@ -209,12 +209,17 @@ class BaseAviary(gym.Env):
         #### Create action and observation spaces ##################
         self.action_space = self._actionSpace()
         self.observation_space = self._observationSpace()
+        #### Generate world description ############################
+        # For now this is done in the housekeeping loop
+
         #### Housekeeping ##########################################
         self._housekeeping()
         #### Update and store the drones kinematic information #####
         self._updateAndStoreKinematicInformation()
         #### Start video recording #################################
         self._startVideoRecording()
+
+
     
     ################################################################################
 
@@ -379,8 +384,16 @@ class BaseAviary(gym.Env):
         terminated = self._computeTerminated()
         truncated = self._computeTruncated()
         info = self._computeInfo()
+        #### Update obstacle positions for next timestep ###########
+        self.environment_description.update_positions()
+        for i in range(len(self.obstacle_ids)):
+            p.resetBasePositionAndOrientation(self.obstacle_ids[i],
+                                              self.environment_description.obstacles[i].current_position,
+                                              [0, 0, 0, 1])
+
         #### Advance the step counter ##############################
         self.step_counter = self.step_counter + (1 * self.PYB_STEPS_PER_CTRL)
+
         return obs, reward, terminated, truncated, info
     
     ################################################################################
@@ -977,32 +990,25 @@ class BaseAviary(gym.Env):
         """
         world_size = np.array([3, 3, 1])
 
-        start_position = (np.random.rand(3) * world_size - [0.5, 0.5, 0] * world_size) * 0.5
-        start_position[0] = -0.5 * world_size[0]
+        self.environment_description = env.WorldDescription(world_size=world_size,
+                                                       n_obstacles_static=0,
+                                                       n_obstacles_dynamic=3,
+                                                       obstacle_size_array=np.array([0.05, 0.1,0.15]))
 
-        goal_position = (np.random.rand(3) * world_size - [0.5, 0.5, 0] * world_size) * 0.5
-        goal_position[0] = 0.5 * world_size[0]
+        self.environment_description.generate_world_description()
 
-        environment_description = env.WorldDescription(world_size=world_size,
-                                                       n_obstacles=20,
-                                                       obstacle_size_array=np.array([0.05, 0.1,0.15]),
-                                                       startpos=start_position,
-                                                       goalpos=goal_position)
+        self.obstacle_ids = np.zeros(self.environment_description.n_obstacles).astype(int)  # Store references to obstacles in array
 
-        environment_description.generate_world_description()
-
-        obstacle_ids = np.zeros(environment_description.n_obstacles).astype(int)  # Store references to obstacles in array
-        print(len(environment_description.obstacles))
-        for i in range(environment_description.n_obstacles):
+        for i in range(self.environment_description.n_obstacles):
             # Generate an obstacle of specified shape in a random place in the world
-            current_obstacle = environment_description.obstacles[i]
+            current_obstacle = self.environment_description.obstacles[i]
 
             position = current_obstacle.current_position
 
             if current_obstacle.shape == "sphere":
                 collision_shape = p.createCollisionShape(p.GEOM_SPHERE,
                                                          radius=current_obstacle.geometric_description["radius"])
-            obstacle_ids[i] = p.createMultiBody(
+            self.obstacle_ids[i] = p.createMultiBody(
             baseMass=0,  # Setting mass to 0 disables physics (but not collisions)
             baseCollisionShapeIndex=collision_shape,
             basePosition=position,
@@ -1012,7 +1018,7 @@ class BaseAviary(gym.Env):
 
             # Set colour of current obstacle to grey
             p.changeVisualShape(
-                obstacle_ids[i],
+                self.obstacle_ids[i],
                -1,  # Link index (-1 for base)
                 rgbaColor=[0.3, 0.3, 0.3, 1]  # RGBA
             )
@@ -1027,7 +1033,7 @@ class BaseAviary(gym.Env):
             p.createMultiBody(
                 baseMass=0,  # Mass 0 makes it static
                 baseVisualShapeIndex=start_marker_id,
-                basePosition=start_position,  # Position in the world
+                basePosition=self.environment_description.startpos,  # Position in the world
                 baseOrientation=p.getQuaternionFromEuler([0, 0, 0])
             )
 
@@ -1041,7 +1047,7 @@ class BaseAviary(gym.Env):
             p.createMultiBody(
                 baseMass=0,  # Mass 0 makes it static
                 baseVisualShapeIndex=end_marker_id,
-                basePosition=goal_position,  # Position in the world
+                basePosition=self.environment_description.goalpos,  # Position in the world
                 baseOrientation=p.getQuaternionFromEuler([0, 0, 0])
             )
 

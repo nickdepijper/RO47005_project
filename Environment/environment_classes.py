@@ -2,20 +2,24 @@ import numpy as np
 
 class WorldDescription:
     "A description of the world in terms of its size, the obstacles in it, and the start and goal positions"
-    def __init__(self, world_size, n_obstacles, obstacle_size_array, startpos, goalpos):
+    def __init__(self, world_size, n_obstacles_static, n_obstacles_dynamic, obstacle_size_array):
         self.world_size = world_size
-        self.n_obstacles = n_obstacles
+        self.n_obstacles_static = n_obstacles_static
+        self.n_obstacles_dynamic = n_obstacles_dynamic
+        self.n_obstacles = self.n_obstacles_static + self.n_obstacles_dynamic
         self.obstacles = []
         self.obstacle_size_array = obstacle_size_array
-        self.startpos = startpos
-        self.goalpos = goalpos
+        self.startpos = None
+        self.goalpos = None
+        self.generate_start_and_goal_pos()
 
     def generate_world_description(self):
         if len(self.obstacles) == 0:
             self.generate_static_obstacles()
+            self.generate_dynamic_obstacles()
 
     def generate_static_obstacles(self):
-        for i in range(self.n_obstacles):
+        for i in range(self.n_obstacles_static):
             staticpath = self.generate_valid_position()
             obstacle = ObstacleDescription(shape="sphere",
                                            size_array=self.obstacle_size_array,
@@ -24,10 +28,28 @@ class WorldDescription:
                                                                             n_timesteps=1))
             self.obstacles.append(obstacle)
 
+    def generate_dynamic_obstacles(self):
+        for i in range(self.n_obstacles_dynamic):
+            path_start = self.generate_valid_position()
+            path_end = self.generate_valid_position()
+            n_steps = int(np.sqrt(np.sum((path_start - path_end)**2))*300)
+            obstacle = ObstacleDescription(shape="sphere",
+                                           size_array=self.obstacle_size_array,
+                                           path_description=PathDescription(start_pos=path_start,
+                                                                            end_pos=path_end,
+                                                                            n_timesteps=n_steps))
+            self.obstacles.append(obstacle)
+
+    def generate_start_and_goal_pos(self):
+        self.startpos = (np.random.rand(3) * self.world_size - [0.5, 0.5, 0] * self.world_size) * 0.5
+        self.startpos[0] = -0.5 * self.world_size[0]
+
+        self.goalpos = (np.random.rand(3) * self.world_size - [0.5, 0.5, 0] * self.world_size) * 0.5
+        self.goalpos[0] = 0.5 * self.world_size[0]
+
     def generate_valid_position(self):
         """Generates a position within the world boundaries"""
         return np.random.rand(3)*self.world_size - [0.5, 0.5, 0] * self.world_size
-
 
     def update_positions(self):
         """Updates all object positions for the next simulation timestep"""
@@ -55,16 +77,23 @@ class ObstacleDescription:
             self.geometric_description = {"shape_type" : self.shape, "radius" : r}
 
     def update_position(self):
-        if self.current_position_index < self.max_position_index and self.move_forward == True:
-            self.current_position_index += 1
-        elif self.current_position_index < self.max_position_index and self.move_forward == False:
-            self.current_position_index -= 1
-        elif self.current_position_index == self.max_position_index:
-            self.move_forward = False
-            self.current_position_index -= 1
-        else:
-            self.move_forward = True
-            self.current_position_index += 1
+        if self.move_forward:
+            if self.current_position_index < self.max_position_index:
+                self.current_position_index += 1
+                self.current_position = self.path[self.current_position_index]
+            else:
+                self.move_forward = False
+                self.current_position_index -= 1
+                self.current_position = self.path[self.current_position_index]
+        else:  # Moving backward
+            if self.current_position_index > 0:
+                self.current_position_index -= 1
+                self.current_position = self.path[self.current_position_index]
+            else:
+                self.move_forward = True
+                self.current_position_index += 1
+                self.current_position = self.path[self.current_position_index]
+
 
 
 class PathDescription:
