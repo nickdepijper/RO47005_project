@@ -993,7 +993,9 @@ class BaseAviary(gym.Env):
         self.environment_description = env.WorldDescription(world_size=world_size,
                                                        n_obstacles_static=0,
                                                        n_obstacles_dynamic=3,
-                                                       obstacle_size_array=np.array([0.05, 0.1,0.15]))
+                                                       n_obstacles_falling=3,
+                                                       sphere_size_array=np.array([0.05, 0.1, 0.15]),
+                                                       cuboid_size_array=np.array([0.05, 0.1, 0.15]))
 
         self.environment_description.generate_world_description()
 
@@ -1008,6 +1010,12 @@ class BaseAviary(gym.Env):
             if current_obstacle.shape == "sphere":
                 collision_shape = p.createCollisionShape(p.GEOM_SPHERE,
                                                          radius=current_obstacle.geometric_description["radius"])
+            elif current_obstacle.shape == "cuboid":
+                print(current_obstacle.geometric_description["xyz_dims"])
+                print(current_obstacle.shape, "")
+                collision_shape = p.createCollisionShape(p.GEOM_BOX,
+                                                         halfExtents=current_obstacle.geometric_description["xyz_dims"])
+
             self.obstacle_ids[i] = p.createMultiBody(
             baseMass=0,  # Setting mass to 0 disables physics (but not collisions)
             baseCollisionShapeIndex=collision_shape,
