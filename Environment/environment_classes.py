@@ -20,6 +20,7 @@ class WorldDescription:
             self.generate_static_obstacles()
             self.generate_dynamic_obstacles()
             self.generate_falling_obstacles()
+            self.randomize_object_start_positions()
 
     def generate_static_obstacles(self):
         for i in range(self.n_obstacles_static):
@@ -59,6 +60,12 @@ class WorldDescription:
                                                                             n_timesteps=1),
                                            is_falling=True)
             self.obstacles.append(obstacle)
+
+    def randomize_object_start_positions(self):
+        for object in self.obstacles:
+
+            object.current_position_index = np.random.randint(0, object.max_position_index)
+            object.current_position = object.path[object.current_position_index, :]
 
     def generate_start_and_goal_pos(self):
         self.startpos = (np.random.rand(3) * self.world_size - [0.5, 0.5, 0] * self.world_size) * 0.5

@@ -995,7 +995,7 @@ class BaseAviary(gym.Env):
                                                        n_obstacles_dynamic=3,
                                                        n_obstacles_falling=3,
                                                        sphere_size_array=np.array([0.05, 0.1, 0.15]),
-                                                       cuboid_size_array=np.array([0.05, 0.1, 0.15]))
+                                                       cuboid_size_array=np.array([0.05, 0.075, 0.1]))
 
         self.environment_description.generate_world_description()
 
@@ -1031,28 +1031,43 @@ class BaseAviary(gym.Env):
                 rgbaColor=[0.3, 0.3, 0.3, 1]  # RGBA
             )
 
-            # Create a red marker at the start position of the drone
-            start_marker_id = p.createVisualShape(p.GEOM_SPHERE,
-                                                  radius=0.05,
-                                                  visualFramePosition=[0, 0, 0],
-                                                  rgbaColor=[1, 0, 0, 0.5],
-                                                  )
+        # Create transparant box to visualise world bounds
+        world_box_id = p.createVisualShape(p.GEOM_BOX,
+                                            halfExtents=world_size / 2,
+                                            visualFramePosition=[0, 0, 0],
+                                            rgbaColor = [0.5, 0.5, 0.5, 0.2],
+                                            )
 
-            p.createMultiBody(
+        p.createMultiBody(
+                baseMass=0,  # Mass 0 makes it static
+                baseVisualShapeIndex=world_box_id,
+                basePosition=[0, 0, self.environment_description.world_size[2] / 2],  # Position in the world
+                baseOrientation=p.getQuaternionFromEuler([0, 0, 0])
+        )
+
+
+        # Create a red marker at the start position of the drone
+        start_marker_id = p.createVisualShape(p.GEOM_SPHERE,
+                                            radius=0.05,
+                                            visualFramePosition=[0, 0, 0],
+                                            rgbaColor=[1, 0, 0, 0.5],
+                                            )
+
+        p.createMultiBody(
                 baseMass=0,  # Mass 0 makes it static
                 baseVisualShapeIndex=start_marker_id,
                 basePosition=self.environment_description.startpos,  # Position in the world
                 baseOrientation=p.getQuaternionFromEuler([0, 0, 0])
-            )
+        )
 
-            # Create a green marker at the end position of the drone
-            end_marker_id = p.createVisualShape(p.GEOM_SPHERE,
-                                                  radius=0.05,
-                                                  visualFramePosition=[0, 0, 0],
-                                                  rgbaColor=[0, 1, 0, 0.5],
-                                                  )
+        # Create a green marker at the end position of the drone
+        end_marker_id = p.createVisualShape(p.GEOM_SPHERE,
+                                            radius=0.05,
+                                            visualFramePosition=[0, 0, 0],
+                                            rgbaColor=[0, 1, 0, 0.5],
+                                            )
 
-            p.createMultiBody(
+        p.createMultiBody(
                 baseMass=0,  # Mass 0 makes it static
                 baseVisualShapeIndex=end_marker_id,
                 basePosition=self.environment_description.goalpos,  # Position in the world
