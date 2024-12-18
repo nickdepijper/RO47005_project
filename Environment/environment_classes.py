@@ -2,15 +2,24 @@ import numpy as np
 
 class WorldDescription:
     "A description of the world in terms of its size, the obstacles in it, and the start and goal positions"
-    def __init__(self, world_size, n_obstacles_static, n_obstacles_dynamic, n_obstacles_falling, sphere_size_array, cuboid_size_array):
+    def __init__(self, world_size,
+                 n_obstacles_static, n_obstacles_dynamic, n_obstacles_falling,
+                 n_obstacles_pillar, n_obstacles_cuboid_floor, n_obstacles_cuboid_ceiling,
+                 sphere_size_array, cuboid_size_array, pillar_size_array):
+
         self.world_size = world_size
         self.n_obstacles_static = n_obstacles_static
         self.n_obstacles_dynamic = n_obstacles_dynamic
         self.n_obstacles_falling = n_obstacles_falling
-        self.n_obstacles = self.n_obstacles_static + self.n_obstacles_dynamic + self.n_obstacles_falling
+        self.n_obstacles_pillar = n_obstacles_pillar
+        self.n_obstacles_cuboid_floor = n_obstacles_cuboid_floor
+        self.n_obstacles_cuboid_ceiling = n_obstacles_cuboid_ceiling
+        self.n_obstacles = self.n_obstacles_static + self.n_obstacles_dynamic + self.n_obstacles_falling \
+                           + self.n_obstacles_pillar + self.n_obstacles_cuboid_floor + self.n_obstacles_cuboid_ceiling
         self.obstacles = []
         self.sphere_size_array = sphere_size_array
         self.cuboid_size_array = cuboid_size_array
+        self.pillar_size_array = pillar_size_array
         self.startpos = None
         self.goalpos = None
         self.generate_start_and_goal_pos()
@@ -20,6 +29,10 @@ class WorldDescription:
             self.generate_static_obstacles()
             self.generate_dynamic_obstacles()
             self.generate_falling_obstacles()
+            self.generate_obstacles_pillar()
+            self.generate_obstacles_cuboid_floor()
+            self.generate_obstacles_cuboid_ceiling()
+
             self.randomize_object_start_positions()
 
     def generate_static_obstacles(self):
@@ -61,11 +74,51 @@ class WorldDescription:
                                            is_falling=True)
             self.obstacles.append(obstacle)
 
-    def randomize_object_start_positions(self):
-        for object in self.obstacles:
+    def generate_obstacles_pillar(self):
+        for i in range(self.n_obstacles_pillar):
+            startpos = self.generate_valid_position()
+            startpos[2] = self.world_size[2] / 2
+            obstacle = ObstacleDescription(shape="cuboid",
+                                           sphere_size_array=self.sphere_size_array,
+                                           cuboid_size_array=self.pillar_size_array,
+                                           path_description=PathDescription(start_pos=startpos,
+                                                                            end_pos=startpos,
+                                                                            n_timesteps=1),
+                                           is_falling=False)
+            obstacle.geometric_description["xyz_dims"][2] = self.world_size[2] / 2
+            self.obstacles.append(obstacle)
 
-            object.current_position_index = np.random.randint(0, object.max_position_index)
-            object.current_position = object.path[object.current_position_index, :]
+    def generate_obstacles_cuboid_floor(self):
+        for i in range(self.n_obstacles_cuboid_floor):
+            staticpath = self.generate_valid_position()
+            obstacle = ObstacleDescription(shape="cuboid",
+                                           sphere_size_array=self.sphere_size_array,
+                                           cuboid_size_array=self.cuboid_size_array,
+                                           path_description=PathDescription(start_pos=staticpath,
+                                                                            end_pos=staticpath,
+                                                                            n_timesteps=1),
+                                           is_falling=False)
+            obstacle.path[:, 2] = obstacle.geometric_description["xyz_dims"][2]
+            self.obstacles.append(obstacle)
+
+    def generate_obstacles_cuboid_ceiling(self):
+        for i in range(self.n_obstacles_cuboid_ceiling):
+            staticpath = self.generate_valid_position()
+            obstacle = ObstacleDescription(shape="cuboid",
+                                           sphere_size_array=self.sphere_size_array,
+                                           cuboid_size_array=self.cuboid_size_array,
+                                           path_description=PathDescription(start_pos=staticpath,
+                                                                            end_pos=staticpath,
+                                                                            n_timesteps=1),
+                                           is_falling=False)
+            obstacle.path[:, 2] = self.world_size[2] - obstacle.geometric_description["xyz_dims"][2]
+            self.obstacles.append(obstacle)
+
+    def randomize_object_start_positions(self):
+        for obstacle in self.obstacles:
+            if obstacle.max_position_index > 0:
+                obstacle.current_position_index = np.random.randint(0, obstacle.max_position_index)
+                obstacle.current_position = obstacle.path[obstacle.current_position_index, :]
 
     def generate_start_and_goal_pos(self):
         self.startpos = (np.random.rand(3) * self.world_size - [0.5, 0.5, 0] * self.world_size) * 0.5

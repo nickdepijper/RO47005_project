@@ -992,14 +992,21 @@ class BaseAviary(gym.Env):
 
         self.environment_description = env.WorldDescription(world_size=world_size,
                                                        n_obstacles_static=0,
-                                                       n_obstacles_dynamic=3,
-                                                       n_obstacles_falling=3,
+                                                       n_obstacles_dynamic=0,
+                                                       n_obstacles_falling=0,
+                                                       n_obstacles_pillar=3,
+                                                       n_obstacles_cuboid_floor=3,
+                                                       n_obstacles_cuboid_ceiling=3,
                                                        sphere_size_array=np.array([0.05, 0.1, 0.15]),
-                                                       cuboid_size_array=np.array([0.05, 0.075, 0.1]))
+                                                       cuboid_size_array=np.array([0.05, 0.075, 0.1]),
+                                                       pillar_size_array=np.array([0.05]))
 
         self.environment_description.generate_world_description()
 
         self.obstacle_ids = np.zeros(self.environment_description.n_obstacles).astype(int)  # Store references to obstacles in array
+        print("length of environment_description.obstacles:", len(self.environment_description.obstacles))
+        print("Value of n_obstacles:", self.environment_description.n_obstacles)
+        print(self.environment_description.obstacles)
 
         for i in range(self.environment_description.n_obstacles):
             # Generate an obstacle of specified shape in a random place in the world
