@@ -1,5 +1,9 @@
 import numpy as np
 
+# todo: Add type hints
+# todo: Generate 'safe zone' for drone spawning
+# todo: Add collision checks for object generation
+
 class WorldDescription:
     """
     A description of the world in terms of its size, the obstacles in it, and the start and goal positions.
@@ -280,7 +284,7 @@ class PathDescription:
 
         returns list of points along timesteps
         """
-        g = 9.81
+        g = 9.81 # hardcoded, very bad!!!!!!!
         start_point = np.array(self.start_pos)
         end_time = np.sqrt(2*self.start_pos[2] / g)
 
