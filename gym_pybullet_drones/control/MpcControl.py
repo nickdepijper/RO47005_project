@@ -14,37 +14,73 @@ class MPCController():
     target_pos: float array(1,3)
         X,Y,Z coordinates of the end position of the drone
     obstacles: float array(N,M,4)
-        X,Y,Z coordinates and radius of M obstacles over N time steps
-    #TODO: If we also have stationary column obstacles, we  should have 2 obstacle lists, one for dynamic, one for static
-    
-    Returns
-    ----------
-    float array()
+        X,Y,Z coordinates and radius of N obstacles over M time steps
+    #TODO: If we also have stationary column obstacles, we  probably need to treat them separately somehow
     """
     def __init__(self,drone, start_pos, target_pos, obstacles):
         """Setup of class variables needed for the controller"""
         self.start_pos = start_pos
         self.target_pos = end_pos
         self.obstacles = obstacles
+        self.current_pos = start_pos
+        
+        self.drone_radius = 2
     
     def _get_obstacle_constraints(self, time_id):
-        """Computes the obstacle constraints for the current time id (row in obstacle column)
+        """Computes the obstacle constraints for the current time id (column in obstacles array)
         
         Parameter
         ----------
-        time_step integer
+        time_id integer
             Id for which time step (row in the obstacle array) to compute the obstacle constraints for
 
         Returns
         ----------
-        #TODO: Probably needs to return 2 array, one for the left side, one for the right side of the inequality equation?
+        float list(N)
+            List with all obstacle constraints
         """
+        # Get current position of drone in simulation
+        drone_x, drone_y, drone_z = self.current_pos
+        # Get radius of drone
+        r_drone = self.drone_radius
+        # Get list of obstacles at requested time ID
+        obstacles = self.obstacles[:,time_id]
+        # Set Safety margin
+        epsilon = 0.1
+
+        constraints = []
+
+        for obstacle in obstacles:
+            obs_x, obs_y, obs_z, r_obs = obstacle
+            constraints.append(
+                cp.maximum(drone_x - (obs_x + r_obs + r_drone + epsilon),  # Right side
+                        (obs_x - r_obs - r_drone - epsilon) - drone_x,  # Left side
+                        drone_y - (obs_y + r_obs + r_drone + epsilon),  # Back side
+                        (obs_y - r_obs - r_drone - epsilon) - drone_y,  # Front side
+                        drone_z - (obs_z + r_obs + r_drone + epsilon),  # Top side
+                        (obs_z - r_obs - r_drone - epsilon) - drone_z) >= 0
+            )
+        
+        return constraints
+
 
     def _set_constraints(self):
-        """Sets the obstacle constraints of the MPC controller"""
+        """Sets the constraints of the MPC controller"""
     
     def _set_cost_function(self):
         """"Sets the cost function of the MPC controller"""
+    
+    def get_control_signal(self):
+        """Computes next control signal
+        Returns
+        ----------
+        float array(4)
+            Thrust, yaw, pitch, roll control signal
+        """
+    
+    def _update_pos(self, pos):
+        """"Placeholder function to ensure we remember to update the position"""
+        raise NotImplementedError()
         
 
 
