@@ -154,7 +154,7 @@ def run(
         for j in range(num_drones):
             path = ctrl_MPC.computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
                                                                     state=obs[j],
-                                                                    target_pos=np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2]]),
+                                                                    target_pos=[0,0.3, 0.3],
                                                                     #target_pos=INIT_XYZS[j, :] + TARGET_POS[wp_counters[j], :],
                                                                     target_rpy=INIT_RPYS[j, :]
                                                                     )
@@ -162,7 +162,7 @@ def run(
             action[j, :], pos_error, _ = ctrl_PID.computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
                                                                     state=obs[j],
                                                                     #target_pos=np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2]]),
-                                                                    target_pos= path[:,2], #INIT_XYZS[j, :] + TARGET_POS[wp_counters[j], :],
+                                                                    target_pos= path[:,-1], #INIT_XYZS[j, :] + TARGET_POS[wp_counters[j], :],
                                                                     target_rpy=INIT_RPYS[j, :]
                                                                     )
                 # Extract target position for visualization
@@ -181,7 +181,7 @@ def run(
 
         #### Draw line to target position #######################
         current_pos = obs[j][:3]  # Drone's current position (x, y, z)
-        target_pos = np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2]])
+        target_pos = [0,0.3,0.3]
         target_line_id = p.addUserDebugLine(
             lineFromXYZ=current_pos,
             lineToXYZ=target_pos,

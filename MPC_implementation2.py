@@ -7,7 +7,7 @@ from gym_pybullet_drones.control.BaseControl import BaseControl
 from gym_pybullet_drones.utils.enums import DroneModel
 
 class SimpleMPC:
-    def __init__(self, horizon=10, timestep=1/240, m=0.027, g=9.8, Ixx=1.4e-5, Iyy=1.4e-5, Izz=2.17e-5):
+    def __init__(self, horizon=40, timestep=1/240, m=0.027, g=9.8, Ixx=1.4e-5, Iyy=1.4e-5, Izz=2.17e-5):
         self.horizon = horizon
         self.timestep = timestep
         self.m = m
@@ -133,7 +133,7 @@ class DSLMPCControl(BaseControl):
         #                            ])
 
         # Initialize MPC
-        self.mpc = SimpleMPC(horizon=15, timestep=1/10, m=0.027, g=g, Ixx=1.4e-5, Iyy=1.4e-5, Izz=2.17e-5)
+        self.mpc = SimpleMPC(horizon=50, timestep=1/5, m=0.027, g=g, Ixx=1.4e-5, Iyy=1.4e-5, Izz=2.17e-5)
 
     def computeControl(self,
                        control_timestep,
@@ -147,7 +147,7 @@ class DSLMPCControl(BaseControl):
                        target_rpy_rates=np.zeros(3)
                        ):
         current_state = np.hstack((cur_pos, cur_vel, p.getEulerFromQuaternion(cur_quat)[:2], cur_ang_vel[:2]))
-        target_state = np.hstack((target_pos, target_vel, target_rpy[:2], target_rpy_rates[:2]))
+        target_state = np.hstack(([0,0.3,0.3], target_vel, target_rpy[:2], target_rpy_rates[:2]))
         #target_state = np.hstack(([0,0,5], target_rpy, target_vel, target_rpy_rates))
 
         
