@@ -20,7 +20,7 @@ class MPCController():
     def __init__(self,drone, start_pos, target_pos, obstacles):
         """Setup of class variables needed for the controller"""
         self.start_pos = start_pos
-        self.target_pos = end_pos
+        self.target_pos = target_pos
         self.obstacles = obstacles
         self.current_pos = start_pos
         
@@ -108,6 +108,17 @@ class DroneDynamics():
             self.C_c = C
             self.D_c = D 
         else:
+            m=0.027
+            g=9.8
+            CD = 7.9379*10**-12
+            CT = 3.1582*10**-10
+            d= 39.73 * 10**-3
+            Ixx=1.4e-5
+            Iyy=1.4e-5
+            Izz=2.17e-5
+            horizon=50
+            timestep=1/48
+            self.timestep = timestep
             # Set default matrices
             print("Using default matrices")
             self.A_c = np.array([
