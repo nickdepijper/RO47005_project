@@ -133,7 +133,7 @@ class DSLMPCControl(BaseControl):
         #                            ])
 
         # Initialize MPC
-        self.mpc = SimpleMPC(horizon=50, timestep=1/10, m=0.027, g=g, Ixx=1.4e-5, Iyy=1.4e-5, Izz=2.17e-5)
+        self.mpc = SimpleMPC(horizon=15, timestep=1/10, m=0.027, g=g, Ixx=1.4e-5, Iyy=1.4e-5, Izz=2.17e-5)
 
     def computeControl(self,
                        control_timestep,
@@ -157,6 +157,6 @@ class DSLMPCControl(BaseControl):
         pos_error = target_pos - cur_pos
         yaw_error = target_rpy[2] - p.getEulerFromQuaternion(cur_quat)[2]
 
-        return rpm, pos_error, yaw_error, path
+        return path #rpm, pos_error, yaw_error, path
 
 
