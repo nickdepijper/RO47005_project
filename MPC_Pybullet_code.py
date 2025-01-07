@@ -153,7 +153,7 @@ def run(
         for j in range(num_drones):
             action[j, :], pos_error, _, path = ctrl_MPC.computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
                                                                     state=obs[j],
-                                                                    target_pos=[0.5,0.5,0.5],#np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2]]),
+                                                                    target_pos=[1.5,1.5,0.5],#np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2]]),
                                                                     #target_pos=INIT_XYZS[j, :] + TARGET_POS[wp_counters[j], :],
                                                                     target_rpy=INIT_RPYS[j, :]
                                                                     )
