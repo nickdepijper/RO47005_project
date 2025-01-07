@@ -150,14 +150,23 @@ def run(
         
 
         #### Compute control for the current way point ############# 
-        
-        for j in range(num_drones):
-            path = ctrl_MPC.computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
-                                                                    state=obs[j],
-                                                                    target_pos=[0,0.3, 0.3],
-                                                                    #target_pos=INIT_XYZS[j, :] + TARGET_POS[wp_counters[j], :],
-                                                                    target_rpy=INIT_RPYS[j, :]
-                                                                    )
+        if i%5 == 0:
+            for j in range(num_drones):
+                path = ctrl_MPC.computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
+                                                                        state=obs[j],
+                                                                        target_pos=[0,0.3, 0.3],
+                                                                        #target_pos=INIT_XYZS[j, :] + TARGET_POS[wp_counters[j], :],
+                                                                        target_rpy=INIT_RPYS[j, :]
+                                                                        )
+            #### Draw path as a line ################################
+            for idx in range(len(path.T) - 1):
+                line_id = p.addUserDebugLine(
+                    lineFromXYZ=path.T[idx],
+                    lineToXYZ=path.T[idx + 1],
+                    lineColorRGB=[1, 0, 0],  # Red line
+                    lineWidth=1.5
+                )
+                previous_debug_lines.append(line_id)
         for j in range(num_drones):
             action[j, :], pos_error, _ = ctrl_PID.computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
                                                                     state=obs[j],
@@ -169,16 +178,8 @@ def run(
         target_pos = target_pos=INIT_XYZS[j, :] + TARGET_POS[wp_counters[j], :]
         print("target_pos= thisssssssssssssssssssssssssshereeeeeeeeeeeeeee", INIT_XYZS[j, :] + TARGET_POS[wp_counters[j], :])
         
-        #### Draw path as a line ################################
-        for idx in range(len(path.T) - 1):
-            line_id = p.addUserDebugLine(
-                lineFromXYZ=path.T[idx],
-                lineToXYZ=path.T[idx + 1],
-                lineColorRGB=[1, 0, 0],  # Red line
-                lineWidth=1.5
-            )
-            previous_debug_lines.append(line_id)
-
+        
+        
         #### Draw line to target position #######################
         current_pos = obs[j][:3]  # Drone's current position (x, y, z)
         target_pos = [0,0.3,0.3]
