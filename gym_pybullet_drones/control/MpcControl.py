@@ -2,7 +2,7 @@ import cvxpy as cp
 import numpy as np
 
 
-class MPCController():
+class MPCController:
     """MPC controller for controlling a drone in a dynamic environment.
     
     Parameters
