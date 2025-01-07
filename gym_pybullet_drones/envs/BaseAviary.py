@@ -995,8 +995,8 @@ class BaseAviary(gym.Env):
                                                        n_obstacles_dynamic=0,
                                                        n_obstacles_falling=5,
                                                        n_obstacles_pillar=10,
-                                                       n_obstacles_cuboid_floor=3,
-                                                       n_obstacles_cuboid_ceiling=3,
+                                                       n_obstacles_cuboid_floor=20,
+                                                       n_obstacles_cuboid_ceiling=20,
                                                        sphere_size_array=np.array([0.05, 0.1, 0.15]),
                                                        cuboid_size_array=np.array([0.05, 0.075, 0.1]),
                                                        pillar_size_array=np.array([0.05]))
