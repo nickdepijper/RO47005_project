@@ -46,9 +46,9 @@ DEFAULT_RECORD_VISION = False
 DEFAULT_PLOT = True
 DEFAULT_USER_DEBUG_GUI = False
 DEFAULT_OBSTACLES = True
-DEFAULT_SIMULATION_FREQ_HZ = 240#240
-DEFAULT_CONTROL_FREQ_HZ = 80# 48
-DEFAULT_DURATION_SEC = 15
+DEFAULT_SIMULATION_FREQ_HZ = 240
+DEFAULT_CONTROL_FREQ_HZ = 60# 48
+DEFAULT_DURATION_SEC = 45
 DEFAULT_OUTPUT_FOLDER = 'results'
 DEFAULT_COLAB = False
 
@@ -142,22 +142,23 @@ def run(
 
         #### Step the simulation ###################################
         obs, reward, terminated, truncated, info = env.step(action)
-
         #### Remove previous debug lines ##########################
         for debug_item in previous_debug_lines:
             p.removeUserDebugItem(debug_item)
         previous_debug_lines = []
-        
+
 
         #### Compute control for the current way point ############# 
         
         for j in range(num_drones):
             action[j, :], pos_error, _, path = ctrl_MPC.computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
                                                                     state=obs[j],
-                                                                    target_pos=[-3.5,-3.5,0.5],#np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2]]),
+                                                                    target_pos=[0.5,0.5,0.5],#np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2]]),
                                                                     #target_pos=INIT_XYZS[j, :] + TARGET_POS[wp_counters[j], :],
                                                                     target_rpy=INIT_RPYS[j, :]
                                                                     )
+
+            env._showDroneLocalAxes(j)
         #for j in range(num_drones):
         #    action[j, :], pos_error, _ = ctrl_PID.computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
         #                                                            state=obs[j],
@@ -167,37 +168,38 @@ def run(
         #                                                            )
                 # Extract target position for visualization
         target_pos = target_pos=INIT_XYZS[j, :] + TARGET_POS[wp_counters[j], :]
+        #print("target_pos= thisssssssssssssssssssssssssshereeeeeeeeeeeeeee", INIT_XYZS[j, :] + TARGET_POS[wp_counters[j], :])
         
-        '''
-        #### Draw path as a line ################################
-        for idx in range(len(path.T) - 1):
-            line_id = p.addUserDebugLine(
-                lineFromXYZ=path.T[idx],
-                lineToXYZ=path.T[idx + 1],
-                lineColorRGB=[1, 0, 0],  # Red line
-                lineWidth=1.5
-            )
-            previous_debug_lines.append(line_id)
+        
+        # #### Draw path as a line ################################
+        # for idx in range(len(path.T) - 1):
+        #     line_id = p.addUserDebugLine(
+        #         lineFromXYZ=path.T[idx],
+        #         lineToXYZ=path.T[idx + 1],
+        #         lineColorRGB=[1, 0, 0],  # Red line
+        #         lineWidth=1.5
+        #     )
+        #     previous_debug_lines.append(line_id)
+        #
+        # #### Draw line to target position #######################
+        # current_pos = obs[j][:3]  # Drone's current position (x, y, z)
+        # target_pos = [-0.5,-0.5,0.5]#np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2]])
+        # target_line_id = p.addUserDebugLine(
+        #     lineFromXYZ=current_pos,
+        #     lineToXYZ=target_pos,
+        #     lineColorRGB=[0, 1, 0],  # Green line
+        #     lineWidth=3
+        # )
+        # previous_debug_lines.append(target_line_id)
+        
+        
+        #print("Action is:", action[j, :])
+        #print("action  isssssssssssssssssssssssssssssssssssssssssssssssss", action[j, :])
 
-        #### Draw line to target position #######################
-        current_pos = obs[j][:3]  # Drone's current position (x, y, z)
-        target_pos = [-3.5,-3.5,0.5]#np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2]])
-        target_line_id = p.addUserDebugLine(
-            lineFromXYZ=current_pos,
-            lineToXYZ=target_pos,
-            lineColorRGB=[0, 1, 0],  # Green line
-            lineWidth=3
-        )
-        previous_debug_lines.append(target_line_id)
-        '''
-        
-        print("Action is:", action[j, :])
-        '''
         #### Go to the next way point and loop #####################
         for j in range(num_drones):
             wp_counters[j] = wp_counters[j] + 1 if wp_counters[j] < (NUM_WP-1) else 0
-        
-        '''
+
         #### Log the simulation ####################################
         for j in range(num_drones):
             logger.log(drone=j,
@@ -206,8 +208,8 @@ def run(
                        control=np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2], INIT_RPYS[j, :], np.zeros(6)])
                        #control=np.hstack([INIT_XYZS[j, :]+TARGET_POS[wp_counters[j], :], INIT_RPYS[j, :], np.zeros(6)])
                        )
-        
-        
+
+
 
         #### Printout ##############################################
         env.render()
@@ -220,8 +222,8 @@ def run(
     env.close()
 
     #### Save the simulation results ###########################
-    #logger.save()
-    #logger.save_as_csv("pid") # Optional CSV save
+    logger.save()
+    logger.save_as_csv("pid") # Optional CSV save
 
     #### Plot the simulation results ###########################
     if plot:
