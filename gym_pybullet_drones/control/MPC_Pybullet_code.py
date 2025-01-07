@@ -130,7 +130,7 @@ def run(
 
     #### Initialize the controllers ############################
 
-    ctrl_MPC = DSLMPCControl(drone_model=drone)
+    ctrl_MPC = DSLMPCControl(drone_model=drone, obstacles=env.environment_description.obstacles)
     ctrl_PID = DSLPIDControl(drone_model=drone)
 
     previous_debug_lines = []
