@@ -172,14 +172,14 @@ def run(
         
         
         # #### Draw path as a line ################################
-        for idx in range(0, len(path.T) - 1, 5):  # Iterate with a step of 5
-            line_id = p.addUserDebugLine(
-                lineFromXYZ=path.T[idx],
-                lineToXYZ=path.T[min(idx + 5, len(path.T) - 1)],  # Ensure we don't exceed the range
-                lineColorRGB=[1, 0, 0],  # Red line
-                lineWidth=1.5
-            )
-            previous_debug_lines.append(line_id)
+        # for idx in range(0, len(path.T) - 1, 5):  # Iterate with a step of 5
+        #     line_id = p.addUserDebugLine(
+        #         lineFromXYZ=path.T[idx],
+        #         lineToXYZ=path.T[min(idx + 5, len(path.T) - 1)],  # Ensure we don't exceed the range
+        #         lineColorRGB=[1, 0, 0],  # Red line
+        #         lineWidth=1.5
+        #     )
+        #     previous_debug_lines.append(line_id)
 
         
         #### Draw line to target position #######################

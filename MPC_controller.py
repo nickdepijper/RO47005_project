@@ -106,12 +106,12 @@ class SimpleMPC:
             cost += (cp.quad_form((x[:,n+1]-target_state),Q)  + cp.quad_form(u[:,n]-u_target, R))
             constraints += [x[:,n+1] == self.A @ x[:,n] + self.B @ u[:,n]]
             # State and input constraints
-            constraints += [x[6, n + 1] <= 0.6]
-            constraints += [x[7, n + 1] <= 0.6]
-            constraints += [x[8, n + 1] <= 0.3]
-            constraints += [x[6, n + 1] >= -0.6]
-            constraints += [x[7, n + 1] >= -0.6]
-            constraints += [x[8, n + 1] >= -0.3]
+            # constraints += [x[6, n + 1] <= 0.6]
+            # constraints += [x[7, n + 1] <= 0.6]
+            # constraints += [x[8, n + 1] <= 0.3]
+            # constraints += [x[6, n + 1] >= -0.6]
+            # constraints += [x[7, n + 1] >= -0.6]
+            # constraints += [x[8, n + 1] >= -0.3]
 
             # constraints += [u[:, n] >= -0.07 * 30]
             # constraints += [u[:, n] <= 0.07 * 30]
@@ -168,8 +168,8 @@ class SimpleMPC:
             Total quadratic cost from nearby obstacles.
         """
         costs = 0.0  # Initialize cost
-        M = 2.0  # Scaling factor for cost
-        distance_threshold = 1.5  # Threshold distance for cost calculation
+        M = 3.0  # Scaling factor for cost
+        distance_threshold = 1  # Threshold distance for cost calculation
         
 
         for obs in obstacles:
