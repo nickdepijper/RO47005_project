@@ -20,6 +20,7 @@ in the X-Y plane, around point (0, -.3).
 
 from MPC_controller import SimpleMPC
 from MPC_controller import DSLMPCControl
+from MPC_planner import SimpleMPCPlanner
 
 import os
 import time
@@ -129,15 +130,15 @@ def run(
                     )
 
     #### Initialize the controllers ############################
-
     ctrl_MPC = DSLMPCControl(drone_model=drone)
-    ctrl_PID = DSLPIDControl(drone_model=drone)
+    planner_MPC = SimpleMPCPlanner(horizon=20, timestep=1, m=0.027, g=9.81)
 
     previous_debug_lines = []
 
     #### Run the simulation ####################################
     action = np.zeros((num_drones,4))
     START = time.time()
+    used = False
     for i in range(0, int(duration_sec*env.CTRL_FREQ)):
 
         #### Step the simulation ###################################
@@ -148,14 +149,41 @@ def run(
         previous_debug_lines = []
 
 
+        # Visualization code for planner MPC
+        if not used:
+            used = True
+            dots = planner_MPC.compute_control(current_state_planner=obs[0], target_state=np.array([1.5,1.5,1.5, 0, 0, 0]))
+            dots = dots.T
+            for dot_coords in dots:
+                id = p.createVisualShape(p.GEOM_SPHERE,
+                                                radius=0.02,
+                                                visualFramePosition=[0, 0, 0],
+                                                rgbaColor=[0, 1, 0, 0.5],
+                                                )
+                p.createMultiBody(
+                    baseMass=0,  # Setting mass to 0 disables physics (but not collisions)
+                    baseVisualShapeIndex=id,
+                    basePosition=dot_coords[:3],
+                    baseOrientation=p.getQuaternionFromEuler([0, 0, 0]),
+                    physicsClientId=env.CLIENT
+                        )
+
+
+
+
         #### Compute control for the current way point ############# 
         
         for j in range(num_drones):
+            particle_state_traj = planner_MPC.compute_control(current_state_planner=obs[j],
+                                               target_state=np.array([1.5, 1.5, 1.5, 0, 0, 0]))
+            target_from_planner_pos = particle_state_traj.T[2, :3]
+            target_from_planner_vel = particle_state_traj.T[2, 3:]
             action[j, :], pos_error, _, path = ctrl_MPC.computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
                                                                     state=obs[j],
-                                                                    target_pos=[0.5,0.5,0.5],#np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2]]),
+                                                                    target_pos=target_from_planner_pos,#np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2]]),
                                                                     #target_pos=INIT_XYZS[j, :] + TARGET_POS[wp_counters[j], :],
-                                                                    target_rpy=INIT_RPYS[j, :]
+                                                                    target_rpy=INIT_RPYS[j, :],
+                                                                    target_vel=target_from_planner_vel
                                                                     )
 
             env._showDroneLocalAxes(j)
