@@ -19,10 +19,8 @@ class SimpleMPC:
         CT = 3.1582e-10
         d= 39.73e-3
 
-        "Save obstacles"
-        self.obstacles = obstacles
-        print("_____OBSTABLES____")
-        print(obstacles)
+        # Obstacles
+        self.static_obstacles, self.dynamic_obstacles = self.split_obstacles(obstacles)
         """
         Define model parameters and state space for linear quadrotor dynamics
         """
@@ -82,7 +80,8 @@ class SimpleMPC:
         x = cp.Variable((10, self.horizon + 1)) # cp.Variable((dim_1, dim_2))
         u = cp.Variable((4, self.horizon))
 
-        # Get constraints from obstacle list
+        # Get static obstacle constraints
+
         
 
         # For each stage in the MPC horizon
@@ -99,6 +98,8 @@ class SimpleMPC:
             constraints += [x[7,n+1] >= -0.5]
             constraints += [u[:,n] >= -0.07*30]
             constraints += [u[:,n] <= 0.07*30]
+            # Static obstacle constraints
+            constraints += self.get_obstacle_constraints(x[0:3,n+1], self.static_obstacles)
 
             
         #Initial state
@@ -107,11 +108,28 @@ class SimpleMPC:
         
         # Solves the problem
         problem = cp.Problem(cp.Minimize(cost), constraints)
-        problem.solve(solver=cp.OSQP)
+        problem.solve()
         # We return the MPC input
         return u[:, 0].value, x[:3, :].value
     
-    def get_obstacle_constraints(self, time_id):
+    def split_obstacles(self, obstacles):
+        """Splits obstacles into dynamic and static ones"""
+        static_obstacles = []
+        dynamic_obstacles = []
+
+        for obstacle in obstacles:
+            # print(f"Obstacle path: {obstacle.path}")
+            # print(f"Current pos: {obstacle.current_position}")
+            # print(f"Dimensions: {obstacle.geometric_description['xyz_dims']}")
+            if len(obstacle.path) == 1:
+                static_obstacles.append(obstacle)
+            elif len(obstacle.path) > 1:
+                dynamic_obstacles.append(obstacle)
+            else:
+                print("Warning: Passed empty obstacle")
+        return static_obstacles, dynamic_obstacles      
+    
+    def get_obstacle_constraints(self, drone_pos, obstacles, time_id=0):
         """Computes the obstacle constraints for the current time id (column in obstacles array)
         
         Parameter
@@ -124,28 +142,30 @@ class SimpleMPC:
         float list(N)
             List with all obstacle constraints
         """
-        # Get current position of drone in simulation
-        drone_x, drone_y, drone_z = self.current_pos
-        # Get radius of drone
-        r_drone = self.drone_radius
-        # Get list of obstacles at requested time ID
-        obstacles = self.obstacles[:,time_id]
-        # Set Safety margin
+        drone_x, drone_y, drone_z = drone_pos
+        r_drone = 0.5
         epsilon = 0.1
-
         constraints = []
 
-        for obstacle in obstacles:
-            obs_x, obs_y, obs_z, r_obs = obstacle
-            constraints.append(
-                cp.maximum(drone_x - (obs_x + r_obs + r_drone + epsilon),  # Right side
-                        (obs_x - r_obs - r_drone - epsilon) - drone_x,  # Left side
-                        drone_y - (obs_y + r_obs + r_drone + epsilon),  # Back side
-                        (obs_y - r_obs - r_drone - epsilon) - drone_y,  # Front side
-                        drone_z - (obs_z + r_obs + r_drone + epsilon),  # Top side
-                        (obs_z - r_obs - r_drone - epsilon) - drone_z) >= 0
-            )
-        
+        for obs in obstacles:
+            obs_x, obs_y, obs_z = obs.path[time_id]
+            Lx, Ly, Lz = obs.geometric_description["xyz_dims"]
+
+            # Binary variables for each face
+            b = cp.Variable(6, boolean=True)
+
+            # Add logical constraints
+            constraints.append(cp.sum(b) == 1)  # At least one face must be active
+
+            # Big-M relaxation for face constraints
+            M = 100  # Large constant
+            constraints.append(drone_x - (obs_x + Lx / 2 + r_drone + epsilon) >= -M * (1 - b[0]))
+            constraints.append((obs_x - Lx / 2 - r_drone - epsilon) - drone_x >= -M * (1 - b[1]))
+            constraints.append(drone_y - (obs_y + Ly / 2 + r_drone + epsilon) >= -M * (1 - b[2]))
+            constraints.append((obs_y - Ly / 2 - r_drone - epsilon) - drone_y >= -M * (1 - b[3]))
+            constraints.append(drone_z - (obs_z + Lz / 2 + r_drone + epsilon) >= -M * (1 - b[4]))
+            constraints.append((obs_z - Lz / 2 - r_drone - epsilon) - drone_z >= -M * (1 - b[5]))
+
         return constraints
 
 
@@ -172,7 +192,7 @@ class DSLMPCControl(BaseControl):
                                     ])
 
         # Initialize MPC
-        self.mpc = SimpleMPC(horizon=15, timestep=1/10, m=0.027, g=g, Ixx=1.4e-5, Iyy=1.4e-5, Izz=2.17e-5, obstacles=obstacles)
+        self.mpc = SimpleMPC(horizon=100, timestep=1/60, m=0.027, g=g, Ixx=1.4e-5, Iyy=1.4e-5, Izz=2.17e-5, obstacles=obstacles)
 
     def computeControl(self,
                        control_timestep,

@@ -170,26 +170,26 @@ def run(
         # print("target_pos= thisssssssssssssssssssssssssshereeeeeeeeeeeeeee", INIT_XYZS[j, :] + TARGET_POS[wp_counters[j], :])
         
         
-        # #### Draw path as a line ################################
-        # for idx in range(len(path.T) - 1):
-        #     line_id = p.addUserDebugLine(
-        #         lineFromXYZ=path.T[idx],
-        #         lineToXYZ=path.T[idx + 1],
-        #         lineColorRGB=[1, 0, 0],  # Red line
-        #         lineWidth=1.5
-        #     )
-        #     previous_debug_lines.append(line_id)
+        #### Draw path as a line ################################
+        for idx in range(len(path.T) - 1):
+            line_id = p.addUserDebugLine(
+                lineFromXYZ=path.T[idx],
+                lineToXYZ=path.T[idx + 1],
+                lineColorRGB=[1, 0, 0],  # Red line
+                lineWidth=1.5
+            )
+            previous_debug_lines.append(line_id)
 
-        # #### Draw line to target position #######################
-        # current_pos = obs[j][:3]  # Drone's current position (x, y, z)
-        # target_pos = [-0.5,-0.5,0.5]#np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2]])
-        # target_line_id = p.addUserDebugLine(
-        #     lineFromXYZ=current_pos,
-        #     lineToXYZ=target_pos,
-        #     lineColorRGB=[0, 1, 0],  # Green line
-        #     lineWidth=3
-        # )
-        # previous_debug_lines.append(target_line_id)
+        #### Draw line to target position #######################
+        current_pos = obs[j][:3]  # Drone's current position (x, y, z)
+        target_pos = [-0.5,-0.5,0.5]#np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2]])
+        target_line_id = p.addUserDebugLine(
+            lineFromXYZ=current_pos,
+            lineToXYZ=target_pos,
+            lineColorRGB=[0, 1, 0],  # Green line
+            lineWidth=3
+        )
+        previous_debug_lines.append(target_line_id)
         
         
         # print("Action is:", action[j, :])
