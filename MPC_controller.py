@@ -83,18 +83,24 @@ class SimpleMPC:
 
         # For each stage in the MPC horizon
         u_target=np.array([self.m*9.81/4,self.m*9.81/4,self.m*9.81/4,self.m*9.81/4])
-        Q = np.diag([10, 10, 10, 1, 1, 1, 100, 100, 10, 1, 1, 1])  # High weight on position/orientation
-        R = 0.01 * np.eye(4)  # Lower weight on control effort
+        Q = np.diag([50, 50, 10, 1, 1, 1, 1, 1, 10, 1, 1, 1])  # High weight on position/orientation
+        R = 0.1 * np.eye(4)  # Lower weight on control effort
         for n in range(self.horizon):
             cost += (cp.quad_form((x[:,n+1]-target_state),Q)  + cp.quad_form(u[:,n]-u_target, R))
             constraints += [x[:,n+1] == self.A @ x[:,n] + self.B @ u[:,n]]
             # State and input constraints
-            constraints += [x[6, n + 1] <= 0.3]
-            constraints += [x[7, n + 1] <= 0.3]
-            #constraints += [x[8, n + 1] <= 0.1]
-            constraints += [x[6, n + 1] >= -0.3]
-            constraints += [x[7, n + 1] >= -0.3]
-            #constraints += [x[8, n + 1] >= -0.1]
+            #constraints += [x[3, n + 1] <= 1]
+            #constraints += [x[4, n + 1] <= 1]
+            #constraints += [x[5, n + 1] <= 1]
+            constraints += [x[6, n + 1] <= 0.6]
+            constraints += [x[7, n + 1] <= 0.6]
+            constraints += [x[8, n + 1] <= 0.3]
+            #constraints += [x[3, n + 1] >= -1]
+            #constraints += [x[4, n + 1] >= -1]
+            #constraints += [x[4, n + 1] >= -1]
+            constraints += [x[6, n + 1] >= -0.6]
+            constraints += [x[7, n + 1] >= -0.6]
+            constraints += [x[8, n + 1] >= -0.3]
 
             #constraints += [u[:, n] >= -0.07 * 30]
             #constraints += [u[:, n] <= 0.07 * 30]
