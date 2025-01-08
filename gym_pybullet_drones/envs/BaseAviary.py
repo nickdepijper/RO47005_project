@@ -191,21 +191,27 @@ class BaseAviary(gym.Env):
                                                             nearVal=0.1,
                                                             farVal=1000.0
                                                             )
+        #### Create obstacle environment #####################################
+        if self.OBSTACLES:
+            self._generate_environment()
+
         #### Set initial poses #####################################
         if initial_xyzs is None:
             self.INIT_XYZS = np.vstack([np.array([x*4*self.L for x in range(self.NUM_DRONES)]), \
                                         np.array([y*4*self.L for y in range(self.NUM_DRONES)]), \
                                         np.ones(self.NUM_DRONES) * (self.COLLISION_H/2-self.COLLISION_Z_OFFSET+.1)]).transpose().reshape(self.NUM_DRONES, 3)
         elif np.array(initial_xyzs).shape == (self.NUM_DRONES,3):
-            self.INIT_XYZS = initial_xyzs
+            self.INIT_XYZS = self.environment_description.startpos
         else:
             print("[ERROR] invalid initial_xyzs in BaseAviary.__init__(), try initial_xyzs.reshape(NUM_DRONES,3)")
         if initial_rpys is None:
             self.INIT_RPYS = np.zeros((self.NUM_DRONES, 3))
         elif np.array(initial_rpys).shape == (self.NUM_DRONES, 3):
-            self.INIT_RPYS = initial_rpys
+            self.INIT_RPYS = np.zeros(3)
         else:
             print("[ERROR] invalid initial_rpys in BaseAviary.__init__(), try initial_rpys.reshape(NUM_DRONES,3)")
+        
+        #self.INIT_XYZS = self.environment_description.start_pos
         #### Create action and observation spaces ##################
         self.action_space = self._actionSpace()
         self.observation_space = self._observationSpace()
@@ -489,6 +495,9 @@ class BaseAviary(gym.Env):
         self.ang_v = np.zeros((self.NUM_DRONES, 3))
         if self.PHYSICS == Physics.DYN:
             self.rpy_rates = np.zeros((self.NUM_DRONES, 3))
+        
+
+
         #### Set PyBullet's parameters #############################
         p.setGravity(0, 0, -self.G, physicsClientId=self.CLIENT)
         p.setRealTimeSimulation(0, physicsClientId=self.CLIENT)
@@ -498,8 +507,8 @@ class BaseAviary(gym.Env):
         self.PLANE_ID = p.loadURDF("plane.urdf", physicsClientId=self.CLIENT)
 
         self.DRONE_IDS = np.array([p.loadURDF(pkg_resources.resource_filename('gym_pybullet_drones', 'assets/'+self.URDF),
-                                              self.INIT_XYZS[i,:],
-                                              p.getQuaternionFromEuler(self.INIT_RPYS[i,:]),
+                                              self.INIT_XYZS,
+                                              p.getQuaternionFromEuler(self.INIT_RPYS),
                                               flags = p.URDF_USE_INERTIA_FROM_FILE,
                                               physicsClientId=self.CLIENT
                                               ) for i in range(self.NUM_DRONES)])
@@ -515,8 +524,7 @@ class BaseAviary(gym.Env):
         #### E.g., to start a drone at [0,0,0] #####################
         # for i in range(self.NUM_DRONES):
             # p.setCollisionFilterPair(bodyUniqueIdA=self.PLANE_ID, bodyUniqueIdB=self.DRONE_IDS[i], linkIndexA=-1, linkIndexB=-1, enableCollision=0, physicsClientId=self.CLIENT)
-        if self.OBSTACLES:
-            self._generate_environment()
+
     
     ################################################################################
 

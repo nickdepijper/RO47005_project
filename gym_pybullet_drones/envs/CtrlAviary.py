@@ -1,10 +1,11 @@
 import numpy as np
 from gymnasium import spaces
 
+import pybullet as p
 from gym_pybullet_drones.envs.BaseAviary import BaseAviary
 from gym_pybullet_drones.utils.enums import DroneModel, Physics
 
-class CtrlAviary(BaseAviary):
+class CtrlAviary_project(BaseAviary):
     """Multi-drone environment class for control applications."""
 
     ################################################################################
@@ -70,6 +71,7 @@ class CtrlAviary(BaseAviary):
                          )
 
     ################################################################################
+
 
     def _actionSpace(self):
         """Returns the action space of the environment.
