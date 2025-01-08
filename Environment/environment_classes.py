@@ -37,8 +37,8 @@ class WorldDescription:
         self.cuboid_size_array = cuboid_size_array
         self.pillar_size_array = pillar_size_array
         self.startpos = None
-        self.goalpos = None
-        self.generate_start_and_goal_pos()
+        self.goalpos = [1.5,1.5,0.5]
+        #self.generate_start_and_goal_pos()
 
     def generate_world_description(self):
         """ For each type of obstacle this calls the associated 'generate' function.
@@ -51,7 +51,7 @@ class WorldDescription:
             self.generate_obstacles_cuboid_floor()
             self.generate_obstacles_cuboid_ceiling()
 
-            self.randomize_object_start_positions()
+            #self.randomize_object_start_positions()
 
     def generate_static_obstacles(self):
         """ Deprecated - randomly spawns static objects in volume"""

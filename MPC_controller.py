@@ -7,7 +7,7 @@ from gym_pybullet_drones.control.BaseControl import BaseControl
 from gym_pybullet_drones.utils.enums import DroneModel
 
 class SimpleMPC:
-    def __init__(self, horizon=500, timestep=1/60, m=0.027, g=9.8, Ixx=1.4e-5, Iyy=1.4e-5, Izz=2.17e-5):
+    def __init__(self, horizon=500, timestep=1/60, m=0.027, g=9.8, Ixx=1.4e-5, Iyy=1.4e-5, Izz=2.17e-5, obstacles=None):
         self.horizon = horizon
         self.timestep = timestep
         self.m = m
@@ -19,6 +19,9 @@ class SimpleMPC:
         CT = 3.1582e-10
         L = 39.73e-3
         gamma_torque = CD/(CT*Izz)
+        repulsion_factor = 1
+        
+        self.static_obstacles, self.dynamic_obstacles = self.split_obstacles(obstacles)
 
         """
         Define model parameters and state space for linear quadrotor dynamics
@@ -80,40 +83,140 @@ class SimpleMPC:
 
         # Initial state
         constraints += [x[:, 0] == current_state.flatten()]
-
         # For each stage in the MPC horizon
         u_target=np.array([self.m*9.81/4,self.m*9.81/4,self.m*9.81/4,self.m*9.81/4])
-        Q = np.diag([10, 10, 10, 1, 1, 1, 100, 100, 10, 1, 1, 1])  # High weight on position/orientation
-        R = 0.01 * np.eye(4)  # Lower weight on control effort
+        Q = np.diag([20, 20, 10, 1, 1, 1, 1, 1, 10, 1, 1, 1])  # High weight on position/orientation
+        R = 0.1 * np.eye(4)  # Lower weight on control effort
+        filtered_obstacles = []
+        # Filter obstacles based on distance to the drone
+        for obs in self.static_obstacles:
+
+            
+            # Calculate distance
+            obstacle_position = obs.path[0]  # Ensure this gives a 3D position
+            drone_position = current_state[:3]  # Drone's current 3D position
+            distance = np.linalg.norm(obstacle_position - drone_position)
+            
+            # Check if the obstacle is within range
+            if distance < 1:
+                filtered_obstacles.append(obs)
+
+
         for n in range(self.horizon):
             cost += (cp.quad_form((x[:,n+1]-target_state),Q)  + cp.quad_form(u[:,n]-u_target, R))
             constraints += [x[:,n+1] == self.A @ x[:,n] + self.B @ u[:,n]]
             # State and input constraints
-            constraints += [x[6, n + 1] <= 0.3]
-            constraints += [x[7, n + 1] <= 0.3]
-            #constraints += [x[8, n + 1] <= 0.1]
-            constraints += [x[6, n + 1] >= -0.3]
-            constraints += [x[7, n + 1] >= -0.3]
-            #constraints += [x[8, n + 1] >= -0.1]
+            constraints += [x[6, n + 1] <= 0.6]
+            constraints += [x[7, n + 1] <= 0.6]
+            constraints += [x[8, n + 1] <= 0.3]
+            constraints += [x[6, n + 1] >= -0.6]
+            constraints += [x[7, n + 1] >= -0.6]
+            constraints += [x[8, n + 1] >= -0.3]
 
-            #constraints += [u[:, n] >= -0.07 * 30]
-            #constraints += [u[:, n] <= 0.07 * 30]
-
+            # constraints += [u[:, n] >= -0.07 * 30]
+            # constraints += [u[:, n] <= 0.07 * 30]
             #Obstacle avoidance
-            #constraints += [A_obs @ x[:2,n] <= b_obs.flatten()]
+            # constraints += [A_obs @ x[:2,n] <= b_obs.flatten()]
+            #print(self.static_obstacles)
+            
 
+            
 
-
+            # Add obstacle costs if there are any filtered obstacles
+            if len(filtered_obstacles) > 0:  # Check if there are close obstacles
+                obstacle_cost = self.get_obstacle_costs(x[:3, n + 1], filtered_obstacles)
+                cost += obstacle_cost
 
         # Solves the problem
         problem = cp.Problem(cp.Minimize(cost), constraints)
         problem.solve(solver=cp.OSQP, verbose=False) # solver=cp.OSQP
         # We return the MPC input
         return u[:, 0].value, x[:3, :].value
+    
+    def split_obstacles(self, obstacles):
+        """Splits obstacles into dynamic and static ones"""
+        static_obstacles = []
+        dynamic_obstacles = []
+
+        for obstacle in obstacles:
+            # print(f"Obstacle path: {obstacle.path}")
+            # print(f"Current pos: {obstacle.current_position}")
+            # print(f"Dimensions: {obstacle.geometric_description['xyz_dims']}")
+            if len(obstacle.path) == 1:
+                static_obstacles.append(obstacle)
+            elif len(obstacle.path) > 1:
+                dynamic_obstacles.append(obstacle)
+            else:
+                print("Warning: Passed empty obstacle")
+        return static_obstacles, dynamic_obstacles      
+    
+    def get_obstacle_costs(self, drone_pos, obstacles, time_id=0):
+        """Computes the obstacle quadratic costs for obstacles close to the drone.
+
+        Parameters
+        ----------
+        drone_pos : cp.Expression
+            Position of the drone as a CVXPY variable.
+        obstacles : list
+            List of obstacle objects.
+        time_id : int, optional
+            Time step index, by default 0
+
+        Returns
+        -------
+        cp.Expression
+            Total quadratic cost from nearby obstacles.
+        """
+        costs = 0.0  # Initialize cost
+        M = 2.0  # Scaling factor for cost
+        distance_threshold = 1.5  # Threshold distance for cost calculation
+        
+
+        for obs in obstacles:
+            # Check for required keys
+            if 'xyz_dims' not in obs.geometric_description:
+                print(f"Warning: Obstacle {obs} is missing 'xyz_dims'. Skipping.")
+                continue
+
+            # Obstacle dimensions and position
+            obstacle_dims = obs.geometric_description["xyz_dims"] / 2  # Half dimensions
+            obstacle_center = obs.path[time_id]  # Center position
+
+            # Generate corner offsets and positions
+            corner_offsets = np.array([
+                [-1, -1, -1],
+                [-1, -1, 1],
+                [-1, 1, -1],
+                [-1, 1, 1],
+                [1, -1, -1],
+                [1, -1, 1],
+                [1, 1, -1],
+                [1, 1, 1]
+            ]) * obstacle_dims  # Scale offsets by half dimensions
+
+            for offset in corner_offsets:
+                corner_position = obstacle_center + offset
+
+                # Compute the squared distance
+                squared_distance = cp.sum_squares(drone_pos - corner_position)
+
+                # Add quadratic cost only if distance is within the threshold
+
+                costs += M * squared_distance
+
+        return costs
+
+
+
+
+
+
+
+
 
 
 class DSLMPCControl(BaseControl):
-    def __init__(self, drone_model: DroneModel, g: float = 9.8):
+    def __init__(self, drone_model: DroneModel, g: float = 9.8, obstacles = None):
         self.PWM2RPM_SCALE = 0.2685
         self.PWM2RPM_CONST = 4070.3
         self.MIN_PWM = 10000
@@ -135,7 +238,7 @@ class DSLMPCControl(BaseControl):
                                     ])
 
         # Initialize MPC
-        self.mpc = SimpleMPC(horizon=40, timestep=1/60, m=0.027, g=g, Ixx=1.4e-5, Iyy=1.4e-5, Izz=2.17e-5)
+        self.mpc = SimpleMPC(horizon=50, timestep=1/60, m=0.027, g=g, Ixx=1.4e-5, Iyy=1.4e-5, Izz=2.17e-5, obstacles=obstacles)
 
     def computeControl(self,
                        control_timestep,

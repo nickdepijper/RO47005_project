@@ -130,7 +130,7 @@ def run(
 
     #### Initialize the controllers ############################
 
-    ctrl_MPC = DSLMPCControl(drone_model=drone)
+    ctrl_MPC = DSLMPCControl(drone_model=drone, obstacles=env.environment_description.obstacles)
     ctrl_PID = DSLPIDControl(drone_model=drone)
 
     previous_debug_lines = []
@@ -172,20 +172,21 @@ def run(
         
         
         # #### Draw path as a line ################################
-        # for idx in range(len(path.T) - 1):
-        #     line_id = p.addUserDebugLine(
-        #         lineFromXYZ=path.T[idx],
-        #         lineToXYZ=path.T[idx + 1],
-        #         lineColorRGB=[1, 0, 0],  # Red line
-        #         lineWidth=1.5
-        #     )
-        #     previous_debug_lines.append(line_id)
-        #
-        # #### Draw line to target position #######################
+        for idx in range(0, len(path.T) - 1, 5):  # Iterate with a step of 5
+            line_id = p.addUserDebugLine(
+                lineFromXYZ=path.T[idx],
+                lineToXYZ=path.T[min(idx + 5, len(path.T) - 1)],  # Ensure we don't exceed the range
+                lineColorRGB=[1, 0, 0],  # Red line
+                lineWidth=1.5
+            )
+            previous_debug_lines.append(line_id)
+
+        
+        #### Draw line to target position #######################
         # current_pos = obs[j][:3]  # Drone's current position (x, y, z)
-        # target_pos = [-0.5,-0.5,0.5]#np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2]])
+        # target_pos = [1.5,1.5,0.5]#np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2]])
         # target_line_id = p.addUserDebugLine(
-        #     lineFromXYZ=current_pos,
+        #    lineFromXYZ=current_pos,
         #     lineToXYZ=target_pos,
         #     lineColorRGB=[0, 1, 0],  # Green line
         #     lineWidth=3
