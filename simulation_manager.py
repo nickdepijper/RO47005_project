@@ -87,7 +87,17 @@ def run(
                         gui=gui,
                         record=record_video,
                         obstacles=obstacles,
-                        user_debug_gui=user_debug_gui
+                        user_debug_gui=user_debug_gui,
+                        world_size=np.array([3,3,1]),
+                        n_obstacles_static=5,
+                        n_obstacles_dynamic=10,
+                        n_obstacles_falling=5,
+                        n_obstacles_pillar=3,
+                        n_obstacles_cuboid_floor=10,
+                        n_obstacles_cuboid_ceiling=5,
+                        sphere_size_array=np.array([0.05, 0.1, 0.15]),
+                        cuboid_size_array=np.array([0.05, 0.075, 0.1]),
+                        pillar_size_array=np.array([0.05])
                         )
 
     #### Obtain the PyBullet Client ID from the environment ####

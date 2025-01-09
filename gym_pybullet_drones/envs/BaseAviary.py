@@ -24,20 +24,30 @@ class BaseAviary(gym.Env):
     ################################################################################
 
     def __init__(self,
-                 drone_model: DroneModel=DroneModel.CF2X,
-                 num_drones: int=1,
-                 neighbourhood_radius: float=np.inf,
-                 initial_xyzs=None,
-                 initial_rpys=None,
-                 physics: Physics=Physics.PYB,
-                 pyb_freq: int = 120,
-                 ctrl_freq: int = 60,
-                 gui=False,
-                 record=False,
-                 obstacles=False,
-                 user_debug_gui=True,
-                 vision_attributes=False,
-                 output_folder='results'
+                drone_model: DroneModel=DroneModel.CF2X,
+                num_drones: int=1,
+                neighbourhood_radius: float=np.inf,
+                initial_xyzs=None,
+                initial_rpys=None,
+                physics: Physics=Physics.PYB,
+                pyb_freq: int = 120,
+                ctrl_freq: int = 60,
+                gui=False,
+                record=False,
+                obstacles=False,
+                user_debug_gui=True,
+                vision_attributes=False,
+                output_folder='results',
+                world_size=np.array([3,3,1]),
+                n_obstacles_static=0,
+                n_obstacles_dynamic=0,
+                n_obstacles_falling=0,
+                n_obstacles_pillar=0,
+                n_obstacles_cuboid_floor=0,
+                n_obstacles_cuboid_ceiling=0,
+                sphere_size_array=np.array([0.05, 0.1, 0.15]),
+                cuboid_size_array=np.array([0.05, 0.075, 0.1]),
+                pillar_size_array=np.array([0.05])
                  ):
         """Initialization of a generic aviary environment.
 
@@ -85,6 +95,17 @@ class BaseAviary(gym.Env):
         #### Parameters ############################################
         self.NUM_DRONES = num_drones
         self.NEIGHBOURHOOD_RADIUS = neighbourhood_radius
+        #### Env Parameters ########################################
+        self.world_size = world_size
+        self.n_obstacles_static = n_obstacles_static
+        self.n_obstacles_dynamic = n_obstacles_dynamic
+        self.n_obstacles_falling = n_obstacles_falling
+        self.n_obstacles_pillar = n_obstacles_pillar
+        self.n_obstacles_cuboid_floor = n_obstacles_cuboid_floor
+        self.n_obstacles_cuboid_ceiling = n_obstacles_cuboid_ceiling
+        self.sphere_size_array = sphere_size_array
+        self.cuboid_size_array = cuboid_size_array
+        self.pillar_size_array = pillar_size_array
         #### Options ###############################################
         self.DRONE_MODEL = drone_model
         self.GUI = gui
@@ -385,11 +406,11 @@ class BaseAviary(gym.Env):
         truncated = self._computeTruncated()
         info = self._computeInfo()
         #### Update obstacle positions for next timestep ###########
-        # self.environment_description.update_positions()
-        # for i in range(len(self.obstacle_ids)):
-        #     p.resetBasePositionAndOrientation(self.obstacle_ids[i],
-        #                                       self.environment_description.obstacles[i].current_position,
-        #                                       [0, 0, 0, 1])
+        self.environment_description.update_positions()
+        for i in range(len(self.obstacle_ids)):
+            p.resetBasePositionAndOrientation(self.obstacle_ids[i],
+                                              self.environment_description.obstacles[i].current_position,
+                                              [0, 0, 0, 1])
 
         #### Advance the step counter ##############################
         self.step_counter = self.step_counter + (1 * self.PYB_STEPS_PER_CTRL)
@@ -515,8 +536,19 @@ class BaseAviary(gym.Env):
         #### E.g., to start a drone at [0,0,0] #####################
         # for i in range(self.NUM_DRONES):
             # p.setCollisionFilterPair(bodyUniqueIdA=self.PLANE_ID, bodyUniqueIdB=self.DRONE_IDS[i], linkIndexA=-1, linkIndexB=-1, enableCollision=0, physicsClientId=self.CLIENT)
-        # if self.OBSTACLES:
-        #     self._generate_environment()
+        if self.OBSTACLES:
+            self._generate_environment(
+                self.world_size,
+                self.n_obstacles_static,
+                self.n_obstacles_dynamic,
+                self.n_obstacles_falling,
+                self.n_obstacles_pillar,
+                self.n_obstacles_cuboid_floor,
+                self.n_obstacles_cuboid_ceiling,
+                self.sphere_size_array,
+                self.cuboid_size_array,
+                self.pillar_size_array
+            )
     
     ################################################################################
 
@@ -985,102 +1017,113 @@ class BaseAviary(gym.Env):
     ################################################################################
 
 
-    # def _generate_environment(self):
-    #     """Add obstacles to the environment.
-    #     Obstacles are loaded from standard URDF files included in Bullet or generated from functions
-    #     """
-    #     world_size = np.array([3, 3, 1])
-    #
-    #     self.environment_description = env.WorldDescription(world_size=world_size,
-    #                                                    n_obstacles_static=0,
-    #                                                    n_obstacles_dynamic=0,
-    #                                                    n_obstacles_falling=5,
-    #                                                    n_obstacles_pillar=10,
-    #                                                    n_obstacles_cuboid_floor=20,
-    #                                                    n_obstacles_cuboid_ceiling=20,
-    #                                                    sphere_size_array=np.array([0.05, 0.1, 0.15]),
-    #                                                    cuboid_size_array=np.array([0.05, 0.075, 0.1]),
-    #                                                    pillar_size_array=np.array([0.05]))
-    #
-    #     self.environment_description.generate_world_description()
-    #
-    #     self.obstacle_ids = np.zeros(self.environment_description.n_obstacles).astype(int)  # Store references to obstacles in array
-    #     print("length of environment_description.obstacles:", len(self.environment_description.obstacles))
-    #     print("Value of n_obstacles:", self.environment_description.n_obstacles)
-    #     print(self.environment_description.obstacles)
-    #
-    #     for i in range(self.environment_description.n_obstacles):
-    #         # Generate an obstacle of specified shape in a random place in the world
-    #         current_obstacle = self.environment_description.obstacles[i]
-    #
-    #         position = current_obstacle.current_position
-    #
-    #         if current_obstacle.shape == "sphere":
-    #             collision_shape = p.createCollisionShape(p.GEOM_SPHERE,
-    #                                                      radius=current_obstacle.geometric_description["radius"])
-    #         elif current_obstacle.shape == "cuboid":
-    #             print(current_obstacle.geometric_description["xyz_dims"])
-    #             print(current_obstacle.shape, "")
-    #             collision_shape = p.createCollisionShape(p.GEOM_BOX,
-    #                                                      halfExtents=current_obstacle.geometric_description["xyz_dims"])
-    #
-    #         self.obstacle_ids[i] = p.createMultiBody(
-    #         baseMass=0,  # Setting mass to 0 disables physics (but not collisions)
-    #         baseCollisionShapeIndex=collision_shape,
-    #         basePosition=position,
-    #         baseOrientation=p.getQuaternionFromEuler([0, 0, 0]),
-    #         physicsClientId=self.CLIENT
-    #         )
-    #
-    #         # Set colour of current obstacle to grey
-    #         p.changeVisualShape(
-    #             self.obstacle_ids[i],
-    #            -1,  # Link index (-1 for base)
-    #             rgbaColor=[0.3, 0.3, 0.3, 1]  # RGBA
-    #         )
-    #
-    #     # Create transparant box to visualise world bounds
-    #     world_box_id = p.createVisualShape(p.GEOM_BOX,
-    #                                         halfExtents=world_size / 2,
-    #                                         visualFramePosition=[0, 0, 0],
-    #                                         rgbaColor = [0.5, 0.5, 0.5, 0.2],
-    #                                         )
-    #
-    #     p.createMultiBody(
-    #             baseMass=0,  # Mass 0 makes it static
-    #             baseVisualShapeIndex=world_box_id,
-    #             basePosition=[0, 0, self.environment_description.world_size[2] / 2],  # Position in the world
-    #             baseOrientation=p.getQuaternionFromEuler([0, 0, 0])
-    #     )
-    #
-    #
-    #     # Create a red marker at the start position of the drone
-    #     start_marker_id = p.createVisualShape(p.GEOM_SPHERE,
-    #                                         radius=0.05,
-    #                                         visualFramePosition=[0, 0, 0],
-    #                                         rgbaColor=[1, 0, 0, 0.5],
-    #                                         )
-    #
-    #     p.createMultiBody(
-    #             baseMass=0,  # Mass 0 makes it static
-    #             baseVisualShapeIndex=start_marker_id,
-    #             basePosition=self.environment_description.startpos,  # Position in the world
-    #             baseOrientation=p.getQuaternionFromEuler([0, 0, 0])
-    #     )
-    #
-    #     # Create a green marker at the end position of the drone
-    #     end_marker_id = p.createVisualShape(p.GEOM_SPHERE,
-    #                                         radius=0.05,
-    #                                         visualFramePosition=[0, 0, 0],
-    #                                         rgbaColor=[0, 1, 0, 0.5],
-    #                                         )
-    #
-    #     p.createMultiBody(
-    #             baseMass=0,  # Mass 0 makes it static
-    #             baseVisualShapeIndex=end_marker_id,
-    #             basePosition=self.environment_description.goalpos,  # Position in the world
-    #             baseOrientation=p.getQuaternionFromEuler([0, 0, 0])
-    #         )
+    def _generate_environment(self,
+                            world_size=np.array([3,3,1]),
+                            n_obstacles_static=0,
+                            n_obstacles_dynamic=0,
+                            n_obstacles_falling=0,
+                            n_obstacles_pillar=0,
+                            n_obstacles_cuboid_floor=0,
+                            n_obstacles_cuboid_ceiling=0,
+                            sphere_size_array=np.array([0.05, 0.1, 0.15]),
+                            cuboid_size_array=np.array([0.05, 0.075, 0.1]),
+                            pillar_size_array=np.array([0.05])
+    ):
+        """Add obstacles to the environment.
+        Obstacles are loaded from standard URDF files included in Bullet or generated from functions
+        """
+        world_size = world_size
+    
+        self.environment_description = env.WorldDescription(world_size=world_size,
+                                                       n_obstacles_static=n_obstacles_static,
+                                                       n_obstacles_dynamic=n_obstacles_dynamic,
+                                                       n_obstacles_falling=n_obstacles_falling,
+                                                       n_obstacles_pillar=n_obstacles_pillar,
+                                                       n_obstacles_cuboid_floor=n_obstacles_cuboid_floor,
+                                                       n_obstacles_cuboid_ceiling=n_obstacles_cuboid_ceiling,
+                                                       sphere_size_array=sphere_size_array,
+                                                       cuboid_size_array=cuboid_size_array,
+                                                       pillar_size_array=pillar_size_array)
+    
+        self.environment_description.generate_world_description()
+    
+        self.obstacle_ids = np.zeros(self.environment_description.n_obstacles).astype(int)  # Store references to obstacles in array
+        print("length of environment_description.obstacles:", len(self.environment_description.obstacles))
+        print("Value of n_obstacles:", self.environment_description.n_obstacles)
+        print(self.environment_description.obstacles)
+    
+        for i in range(self.environment_description.n_obstacles):
+            # Generate an obstacle of specified shape in a random place in the world
+            current_obstacle = self.environment_description.obstacles[i]
+    
+            position = current_obstacle.current_position
+    
+            if current_obstacle.shape == "sphere":
+                collision_shape = p.createCollisionShape(p.GEOM_SPHERE,
+                                                         radius=current_obstacle.geometric_description["radius"])
+            elif current_obstacle.shape == "cuboid":
+                print(current_obstacle.geometric_description["xyz_dims"])
+                print(current_obstacle.shape, "")
+                collision_shape = p.createCollisionShape(p.GEOM_BOX,
+                                                         halfExtents=current_obstacle.geometric_description["xyz_dims"])
+    
+            self.obstacle_ids[i] = p.createMultiBody(
+            baseMass=0,  # Setting mass to 0 disables physics (but not collisions)
+            baseCollisionShapeIndex=collision_shape,
+            basePosition=position,
+            baseOrientation=p.getQuaternionFromEuler([0, 0, 0]),
+            physicsClientId=self.CLIENT
+            )
+    
+            # Set colour of current obstacle to grey
+            p.changeVisualShape(
+                self.obstacle_ids[i],
+               -1,  # Link index (-1 for base)
+                rgbaColor=[0.3, 0.3, 0.3, 1]  # RGBA
+            )
+    
+        # Create transparant box to visualise world bounds
+        world_box_id = p.createVisualShape(p.GEOM_BOX,
+                                            halfExtents=world_size / 2,
+                                            visualFramePosition=[0, 0, 0],
+                                            rgbaColor = [0.5, 0.5, 0.5, 0.2],
+                                            )
+    
+        p.createMultiBody(
+                baseMass=0,  # Mass 0 makes it static
+                baseVisualShapeIndex=world_box_id,
+                basePosition=[0, 0, self.environment_description.world_size[2] / 2],  # Position in the world
+                baseOrientation=p.getQuaternionFromEuler([0, 0, 0])
+        )
+    
+    
+        # Create a red marker at the start position of the drone
+        start_marker_id = p.createVisualShape(p.GEOM_SPHERE,
+                                            radius=0.05,
+                                            visualFramePosition=[0, 0, 0],
+                                            rgbaColor=[1, 0, 0, 0.5],
+                                            )
+    
+        p.createMultiBody(
+                baseMass=0,  # Mass 0 makes it static
+                baseVisualShapeIndex=start_marker_id,
+                basePosition=self.environment_description.startpos,  # Position in the world
+                baseOrientation=p.getQuaternionFromEuler([0, 0, 0])
+        )
+    
+        # Create a green marker at the end position of the drone
+        end_marker_id = p.createVisualShape(p.GEOM_SPHERE,
+                                            radius=0.05,
+                                            visualFramePosition=[0, 0, 0],
+                                            rgbaColor=[0, 1, 0, 0.5],
+                                            )
+    
+        p.createMultiBody(
+                baseMass=0,  # Mass 0 makes it static
+                baseVisualShapeIndex=end_marker_id,
+                basePosition=self.environment_description.goalpos,  # Position in the world
+                baseOrientation=p.getQuaternionFromEuler([0, 0, 0])
+            )
 
         """
         # legacy code. DO NOT REMOVE -max

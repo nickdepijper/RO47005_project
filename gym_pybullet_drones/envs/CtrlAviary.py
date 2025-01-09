@@ -10,20 +10,30 @@ class CtrlAviary(BaseAviary):
     ################################################################################
 
     def __init__(self,
-                 drone_model: DroneModel=DroneModel.CF2X,
-                 num_drones: int=1,
-                 neighbourhood_radius: float=np.inf,
-                 initial_xyzs=None,
-                 initial_rpys=None,
-                 physics: Physics=Physics.PYB,
-                 pyb_freq: int = 240,
-                 ctrl_freq: int = 240,
-                 gui=False,
-                 record=False,
-                 obstacles=False,
-                 user_debug_gui=True,
-                 output_folder='results'
-                 ):
+            drone_model: DroneModel=DroneModel.CF2X,
+            num_drones: int=1,
+            neighbourhood_radius: float=np.inf,
+            initial_xyzs=None,
+            initial_rpys=None,
+            physics: Physics=Physics.PYB,
+            pyb_freq: int = 240,
+            ctrl_freq: int = 240,
+            gui=False,
+            record=False,
+            obstacles=False,
+            user_debug_gui=True,
+            output_folder='results',
+            world_size=np.array([3,3,1]),
+            n_obstacles_static=0,
+            n_obstacles_dynamic=0,
+            n_obstacles_falling=0,
+            n_obstacles_pillar=0,
+            n_obstacles_cuboid_floor=0,
+            n_obstacles_cuboid_ceiling=0,
+            sphere_size_array=np.array([0.05, 0.1, 0.15]),
+            cuboid_size_array=np.array([0.05, 0.075, 0.1]),
+            pillar_size_array=np.array([0.05])
+                ):
         """Initialization of an aviary environment for control applications.
 
         Parameters
@@ -53,21 +63,31 @@ class CtrlAviary(BaseAviary):
         user_debug_gui : bool, optional
             Whether to draw the drones' axes and the GUI RPMs sliders.
 
-        """
+    """
         super().__init__(drone_model=drone_model,
-                         num_drones=num_drones,
-                         neighbourhood_radius=neighbourhood_radius,
-                         initial_xyzs=initial_xyzs,
-                         initial_rpys=initial_rpys,
-                         physics=physics,
-                         pyb_freq=pyb_freq,
-                         ctrl_freq=ctrl_freq,
-                         gui=gui,
-                         record=record,
-                         obstacles=obstacles,
-                         user_debug_gui=user_debug_gui,
-                         output_folder=output_folder
-                         )
+                        num_drones=num_drones,
+                        neighbourhood_radius=neighbourhood_radius,
+                        initial_xyzs=initial_xyzs,
+                        initial_rpys=initial_rpys,
+                        physics=physics,
+                        pyb_freq=pyb_freq,
+                        ctrl_freq=ctrl_freq,
+                        gui=gui,
+                        record=record,
+                        obstacles=obstacles,
+                        user_debug_gui=user_debug_gui,
+                        output_folder=output_folder,
+                        world_size=np.array([3,3,1]),
+                        n_obstacles_static=n_obstacles_static,
+                        n_obstacles_dynamic=n_obstacles_dynamic,
+                        n_obstacles_falling=n_obstacles_falling,
+                        n_obstacles_pillar=n_obstacles_pillar,
+                        n_obstacles_cuboid_floor=n_obstacles_cuboid_floor,
+                        n_obstacles_cuboid_ceiling=n_obstacles_cuboid_ceiling,
+                        sphere_size_array=sphere_size_array,
+                        cuboid_size_array=cuboid_size_array,
+                        pillar_size_array=pillar_size_array
+                            )
 
     ################################################################################
 
