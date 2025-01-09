@@ -87,30 +87,30 @@ class SimpleMPC:
         constraints += [x[:, 0] == current_state.flatten()]
         # For each stage in the MPC horizon
         u_target=np.array([self.m*9.81/4,self.m*9.81/4,self.m*9.81/4,self.m*9.81/4])
-        Q = np.diag([20, 20, 10, 1, 1, 1, 1, 1, 10, 1, 1, 1])  # High weight on position/orientation
+        Q = np.diag([50, 50, 30, 10, 10, 10, 5, 5, 10, 1, 1, 1])  # High weight on position/orientation
         R = 0.1 * np.eye(4)  # Lower weight on control effort
         filtered_obstacles = []
         # Filter obstacles based on distance to the drone
         for obs in self.static_obstacles:
-
-            
             # Calculate distance
             obstacle_position = obs.path[0]  # Ensure this gives a 3D position
             drone_position = current_state[:3]  # Drone's current 3D position
             distance = np.linalg.norm(obstacle_position - drone_position)
             
             # Check if the obstacle is within range
-            if distance < 2:
+            if distance < 1:
                 filtered_obstacles.append(obstacle_position)
 
 
-        A_obs,b_obs=self.convexify(current_state[:3], 0.005, filtered_obstacles)
-        x_intergoal = self.get_intermediate_goal(current_state[:3].flatten(), 0,target_state[:3].flatten(), A_obs,b_obs).flatten()[0:3]
-        
+
+        A_obs, b_obs=self.convexify(current_state[:3], 0.05, filtered_obstacles)
+        x_intergoal = self.get_intermediate_goal(current_state[:3].flatten(), 0.005 ,target_state[:3].flatten(), A_obs,b_obs).flatten()[0:3]
         target_state = np.hstack([x_intergoal,target_state[3:]])
 
+        print(x_intergoal)
+
         #Obstacle avoidance
-        print("A_obstackle is this: " , A_obs, "     ", b_obs)
+        #print("A_obstacle is this: " , A_obs, "     ", b_obs)
 
         for n in range(self.horizon):
             cost += (cp.quad_form((x[:,n+1]-target_state),Q)  + cp.quad_form(u[:,n]-u_target, R))
@@ -126,11 +126,11 @@ class SimpleMPC:
             # constraints += [u[:, n] >= -0.07 * 30]
             # constraints += [u[:, n] <= 0.07 * 30]
             #Obstacle avoidance
-            print("A_obstackle is this: " , (A_obs @ x[:3,n]), "     ", b_obs.flatten())
-
-            constraints += [A_obs @ x[:3,n] <= b_obs.flatten()]
+            #print("A_obstackle is this: " , (A_obs @ x[:3,n]), "     ", b_obs.flatten())
+            #if len(A_obs) > 0:
+                  #constraints += [A_obs @ x[:3,n] <= b_obs.flatten()]
             #print(self.static_obstacles)
-            
+
 
             
 
@@ -141,7 +141,7 @@ class SimpleMPC:
 
         # Solves the problem
         problem = cp.Problem(cp.Minimize(cost), constraints)
-        problem.solve(solver=cp.OSQP, verbose=False) # solver=cp.OSQP
+        problem.solve(verbose=False) # solver=cp.OSQP
         # We return the MPC input
         return u[:, 0].value, x[:3, :].value
     
@@ -230,19 +230,17 @@ class SimpleMPC:
         A+=np.random.normal(0, 0.01, 1)
         '''
 
-        # Calculate a point on the plane
-        point = p_obs + (r_drone + r_obs) * (p - p_obs) / np.linalg.norm(p - p_obs)
         
         # Calculate the normal vector of the plane (direction from p_obs to p)
         normal = (p - p_obs) / np.linalg.norm(p - p_obs)
-        
+
         # Ensure the plane faces in the correct direction relative to point p
-        if np.dot(normal, p - point) > 0:
+        if np.dot(normal, p - p_obs) < 0:
             normal = -normal
-        
-        # Add noise to the normal vector for randomness
-        normal += np.random.normal(0, 0.01, normal.shape)
-        normal /= np.linalg.norm(normal)  # Normalize the vector
+
+        # Calculate a point on the plane
+        point = p_obs + normal * (r_obs + r_drone)
+
         
         # Calculate the plane constant b
         b = -np.dot(normal, point)
@@ -250,43 +248,48 @@ class SimpleMPC:
         # For CVXPY, A is just the normal vector (1x3) and b is a scalar
         A = normal #.reshape(1, -1)  # Reshape to 1x3 for CVXPY compatibility
         if np.dot(A,p) > b:
-            A=-A
-            b=-b
+              A=-A
+              b=-b
+
         return A,b
 
     def convexify(self,p,r_drone,obstacle_list):
         A=[]
         b=[]
         for obstacle in obstacle_list:
-            p_obs=obstacle[:3]
-            r_obs= 0.001 #obstacle[2]
-            A_obs,b_obs=self.get_coeff(p,r_drone,p_obs,r_obs)
+            p_obs=obstacle
+            r_obs= 0.15 #obstacle[2]
+            A_obs, b_obs=self.get_coeff(p,r_drone,p_obs,r_obs)
             A.append(A_obs)
             b.append(b_obs)
+        #print(A)
         return np.array(A),np.array(b)
 
-    def get_intermediate_goal(self, pos,r_drone, goal_pos, A,b):
-        new_b=self.get_new_constraints(pos,r_drone, goal_pos, A,b)
+    def get_intermediate_goal(self, pos,r_drone, goal_pos, A, b):
+        if len(A) > 0:
+            new_b=self.get_new_constraints(pos,r_drone, goal_pos, A,b)
+
+            cost = 0.
+            constraints = []
+
+            # Create the optimization variables
+            x = cp.Variable((3, 1))
+            # Add constraints
 
 
-        cost = 0.
-        constraints = []
-        
-        # Create the optimization variables
-        x = cp.Variable((3, 1)) 
-        # Add constraints
+            #print("new_b is this", np.shape(b[:,np.newaxis]))
+            #print("new_A is this", np.shape((A[:,:]@x)))
+            constraints+=[A@x<=new_b[:,np.newaxis]]
 
-  
-        print("new_b is this", np.shape(b[:,np.newaxis]))
-        print("new_A is this", np.shape((A[:,:]@x)))
-        constraints+=[A[:,:]@x<=new_b[:,np.newaxis]]
-        
-        #Cost is distance to goal
-        cost+=cp.sum_squares(x-goal_pos[:,np.newaxis])
+            #Cost is distance to goal
+            cost+=cp.sum_squares(x-goal_pos[:,np.newaxis])
 
-        problem = cp.Problem(cp.Minimize(cost), constraints)
-        problem.solve()
-        return x.value
+            problem = cp.Problem(cp.Minimize(cost), constraints)
+            problem.solve()
+            return x.value
+
+        else:
+            return goal_pos
 
 
     def get_new_constraints(self, pos,r_drone, goal_pos, A,b):

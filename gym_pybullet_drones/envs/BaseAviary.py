@@ -991,13 +991,13 @@ class BaseAviary(gym.Env):
         world_size = np.array([3, 3, 1])
 
         self.environment_description = env.WorldDescription(world_size=world_size,
-                                                       n_obstacles_static=0,
+                                                       n_obstacles_static=30,
                                                        n_obstacles_dynamic=0,
                                                        n_obstacles_falling=0,
-                                                       n_obstacles_pillar=5,
+                                                       n_obstacles_pillar=0,
                                                        n_obstacles_cuboid_floor=1,
                                                        n_obstacles_cuboid_ceiling=0,
-                                                       sphere_size_array=np.array([0.05, 0.1, 0.15]),
+                                                       sphere_size_array=np.array([0.15, 0.15, 0.15]),
                                                        cuboid_size_array=np.array([0.05, 0.075, 0.1]),
                                                        pillar_size_array=np.array([0.05]))
 
