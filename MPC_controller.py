@@ -100,14 +100,17 @@ class SimpleMPC:
             distance = np.linalg.norm(obstacle_position - drone_position)
             
             # Check if the obstacle is within range
-            if distance < 1.0:
+            if distance < 2:
                 filtered_obstacles.append(obstacle_position)
 
 
-        A_obs,b_obs=self.convexify(current_state[:2], 0.05, filtered_obstacles)
-        x_intergoal = self.get_intermediate_goal(current_state[:2].flatten(), 0,target_state[:2].flatten(), A_obs,b_obs).flatten()[0:2]
+        A_obs,b_obs=self.convexify(current_state[:3], 0.005, filtered_obstacles)
+        x_intergoal = self.get_intermediate_goal(current_state[:3].flatten(), 0,target_state[:3].flatten(), A_obs,b_obs).flatten()[0:3]
         
-        target_state = np.hstack([x_intergoal,target_state[2:]])
+        target_state = np.hstack([x_intergoal,target_state[3:]])
+
+        #Obstacle avoidance
+        print("A_obstackle is this: " , A_obs, "     ", b_obs)
 
         for n in range(self.horizon):
             cost += (cp.quad_form((x[:,n+1]-target_state),Q)  + cp.quad_form(u[:,n]-u_target, R))
@@ -123,7 +126,9 @@ class SimpleMPC:
             # constraints += [u[:, n] >= -0.07 * 30]
             # constraints += [u[:, n] <= 0.07 * 30]
             #Obstacle avoidance
-            constraints += [A_obs @ x[:2,n] <= b_obs.flatten()]
+            print("A_obstackle is this: " , (A_obs @ x[:3,n]), "     ", b_obs.flatten())
+
+            constraints += [A_obs @ x[:3,n] <= b_obs.flatten()]
             #print(self.static_obstacles)
             
 
@@ -214,7 +219,7 @@ class SimpleMPC:
         return costs
 
     def get_coeff(self,p,r_drone,p_obs,r_obs):
-
+        '''
         point=p_obs+(r_drone+r_obs)*(p-p_obs)/np.linalg.norm(p-p_obs)
         a=-(p-p_obs)[0]/(p-p_obs)[1]
         b=point[1]-a*point[0]
@@ -223,14 +228,38 @@ class SimpleMPC:
             A=-A
             b=-b
         A+=np.random.normal(0, 0.01, 1)
+        '''
+
+        # Calculate a point on the plane
+        point = p_obs + (r_drone + r_obs) * (p - p_obs) / np.linalg.norm(p - p_obs)
+        
+        # Calculate the normal vector of the plane (direction from p_obs to p)
+        normal = (p - p_obs) / np.linalg.norm(p - p_obs)
+        
+        # Ensure the plane faces in the correct direction relative to point p
+        if np.dot(normal, p - point) > 0:
+            normal = -normal
+        
+        # Add noise to the normal vector for randomness
+        normal += np.random.normal(0, 0.01, normal.shape)
+        normal /= np.linalg.norm(normal)  # Normalize the vector
+        
+        # Calculate the plane constant b
+        b = -np.dot(normal, point)
+        
+        # For CVXPY, A is just the normal vector (1x3) and b is a scalar
+        A = normal #.reshape(1, -1)  # Reshape to 1x3 for CVXPY compatibility
+        if np.dot(A,p) > b:
+            A=-A
+            b=-b
         return A,b
 
     def convexify(self,p,r_drone,obstacle_list):
         A=[]
         b=[]
         for obstacle in obstacle_list:
-            p_obs=obstacle[:2]
-            r_obs= 0.1 #obstacle[2]
+            p_obs=obstacle[:3]
+            r_obs= 0.001 #obstacle[2]
             A_obs,b_obs=self.get_coeff(p,r_drone,p_obs,r_obs)
             A.append(A_obs)
             b.append(b_obs)
@@ -244,10 +273,14 @@ class SimpleMPC:
         constraints = []
         
         # Create the optimization variables
-        x = cp.Variable((2, 1)) 
+        x = cp.Variable((3, 1)) 
         # Add constraints
-        constraints+=[A[:,:]@x<=new_b[:,np.newaxis]]
 
+  
+        print("new_b is this", np.shape(b[:,np.newaxis]))
+        print("new_A is this", np.shape((A[:,:]@x)))
+        constraints+=[A[:,:]@x<=new_b[:,np.newaxis]]
+        
         #Cost is distance to goal
         cost+=cp.sum_squares(x-goal_pos[:,np.newaxis])
 
@@ -255,11 +288,11 @@ class SimpleMPC:
         problem.solve()
         return x.value
 
+
     def get_new_constraints(self, pos,r_drone, goal_pos, A,b):
         new_b=[]
         for i in range(len(b)):
             new_b.append(b[i]-r_drone/(np.sin(np.arctan(1/np.abs(A[i,0])))))
-
         return np.array(new_b)
 
 
