@@ -43,19 +43,23 @@ DEFAULT_COLAB = False
 
 # Environment Setup
 WORLD_SIZE=np.array([3,3,1]),
-N_OBSTACLES_STATIC=5,
-N_OBSTACLES_DYNAMIC=0,
-N_OBSTACLES_FALLING=0,
-N_OBSTACLES_PILLAR=3,
-N_OBSTACLES_CUBOID_FLOOR=10,
-N_OBSTACLES_CUBOID_CEILING=5,
-SPHERE_SIZE_ARRAY=np.array([0.05, 0.1, 0.15]),
-CUBOID_SIZE_ARRAY=np.array([0.05, 0.075, 0.1]),
+N_OBSTACLES_STATIC=5
+N_OBSTACLES_DYNAMIC=0
+N_OBSTACLES_FALLING=0
+N_OBSTACLES_PILLAR=0
+N_OBSTACLES_CUBOID_FLOOR=5
+N_OBSTACLES_CUBOID_CEILING=5
+SPHERE_SIZE_ARRAY=np.array([0.05, 0.1, 0.15])
+CUBOID_SIZE_ARRAY=np.array([0.05, 0.075, 0.1])
 PILLAR_SIZE_ARRAY=np.array([0.05])
 
 # Debug functionality
 DEFAULT_USER_DEBUG_GUI = False
 MPC_TRAJECTORY = False
+
+# MPC Control Options
+MPC_POINT = False # MPC with point mass dynamics model
+MPC_DRONE = True # MPC Controller with drone dynamics model
 
 def run(
         drone=DEFAULT_DRONES,
@@ -115,16 +119,16 @@ def run(
                         record=record_video,
                         obstacles=obstacles,
                         user_debug_gui=user_debug_gui,
-                        world_size=np.array([3,3,1]),
-                        n_obstacles_static=5,
-                        n_obstacles_dynamic=0,
-                        n_obstacles_falling=0,
-                        n_obstacles_pillar=3,
-                        n_obstacles_cuboid_floor=10,
-                        n_obstacles_cuboid_ceiling=5,
-                        sphere_size_array=np.array([0.05, 0.1, 0.15]),
-                        cuboid_size_array=np.array([0.05, 0.075, 0.1]),
-                        pillar_size_array=np.array([0.05])
+                        world_size=WORLD_SIZE,
+                        n_obstacles_static=n_obstacles_static,
+                        n_obstacles_dynamic=n_obstacles_dynamic,
+                        n_obstacles_falling=n_obstacles_falling,
+                        n_obstacles_pillar=n_obstacles_pillar,
+                        n_obstacles_cuboid_floor=n_obstacles_cuboid_floor,
+                        n_obstacles_cuboid_ceiling=n_obstacles_cuboid_ceiling,
+                        sphere_size_array=sphere_size_array,
+                        cuboid_size_array=cuboid_size_array,
+                        pillar_size_array=pillar_size_array
                         )
 
     #### Obtain the PyBullet Client ID from the environment ####
@@ -138,8 +142,11 @@ def run(
                     )
 
     #### Initialize the controllers ############################
-    ctrl_MPC = DSLMPCControl(drone_model=drone)
-    planner_MPC = MPCPlanner(horizon=20, timestep=1, m=0.027, g=9.81)
+    if MPC_DRONE:
+        ctrl_MPC = DSLMPCControl(drone_model=drone, horizon=10, timestep=1/60, obstacles=env.environment_description.obstacles)
+    
+    if MPC_POINT:
+        planner_MPC = MPCPlanner(horizon=20, timestep=1, m=0.027, g=9.81)
 
     previous_debug_lines = []
 
@@ -156,38 +163,42 @@ def run(
             p.removeUserDebugItem(debug_item)
         previous_debug_lines = []
 
-        # Visualization code for planner MPC
-        if not used:
-            used = True
-            dots = planner_MPC.compute_control(current_state_planner=obs[0], target_state=TARGET_STATE)
-            dots = dots.T
-            for dot_coords in dots:
-                id = p.createVisualShape(p.GEOM_SPHERE,
-                                                radius=0.02,
-                                                visualFramePosition=[0, 0, 0],
-                                                rgbaColor=[0, 1, 0, 0.5],
-                                                )
-                p.createMultiBody(
-                    baseMass=0,  # Setting mass to 0 disables physics (but not collisions)
-                    baseVisualShapeIndex=id,
-                    basePosition=dot_coords[:3],
-                    baseOrientation=p.getQuaternionFromEuler([0, 0, 0]),
-                    physicsClientId=env.CLIENT
-                        )
+        # Visualization code for planner MPC, if it is used
+        if MPC_POINT:
+            if not used:
+                used = True
+                dots = planner_MPC.compute_control(current_state_planner=obs[0], target_state=TARGET_STATE)
+                dots = dots.T
+                for dot_coords in dots:
+                    id = p.createVisualShape(p.GEOM_SPHERE,
+                                                    radius=0.02,
+                                                    visualFramePosition=[0, 0, 0],
+                                                    rgbaColor=[0, 1, 0, 0.5],
+                                                    )
+                    p.createMultiBody(
+                        baseMass=0,  # Setting mass to 0 disables physics (but not collisions)
+                        baseVisualShapeIndex=id,
+                        basePosition=dot_coords[:3],
+                        baseOrientation=p.getQuaternionFromEuler([0, 0, 0]),
+                        physicsClientId=env.CLIENT
+                            )
 
         #### Compute control for the current way point ############# 
         
         for j in range(num_drones):
-            particle_state_traj = planner_MPC.compute_control(current_state_planner=obs[j],
-                                               target_state=TARGET_STATE)
-            target_from_planner_pos = particle_state_traj.T[2, :3]
-            target_from_planner_vel = particle_state_traj.T[2, 3:]
-            action[j, :], pos_error, _, path = ctrl_MPC.computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
-                                                                    state=obs[j],
-                                                                    target_pos=target_from_planner_pos,
-                                                                    target_rpy=INIT_RPYS[j, :],
-                                                                    target_vel=target_from_planner_vel
-                                                                    )
+            if MPC_POINT:
+                particle_state_traj = planner_MPC.compute_control(current_state_planner=obs[j],
+                                                target_state=TARGET_STATE)
+                target_from_planner_pos = particle_state_traj.T[2, :3]
+                target_from_planner_vel = particle_state_traj.T[2, 3:]
+            
+            if MPC_DRONE:
+                action[j, :], pos_error, _, path = ctrl_MPC.computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
+                                                                        state=obs[j],
+                                                                        target_pos=TARGET_STATE[0:3],
+                                                                        target_rpy=INIT_RPYS[j, :],
+                                                                        target_vel=TARGET_STATE[3:]
+                                                                        )
 
             env._showDroneLocalAxes(j)
         # Extract target position for visualization
@@ -263,4 +274,5 @@ if __name__ == "__main__":
     parser.add_argument('--colab',              default=DEFAULT_COLAB, type=bool,           help='Whether example is being run by a notebook (default: "False")', metavar='')
     ARGS = parser.parse_args()
 
-    run(**vars(ARGS))
+    #run(**vars(ARGS))
+    run()
