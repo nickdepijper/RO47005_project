@@ -41,7 +41,19 @@ DEFAULT_DURATION_SEC = 45
 DEFAULT_OUTPUT_FOLDER = 'results'
 DEFAULT_COLAB = False
 
-# DEBUG FUNCTIONALITY
+# Environment Setup
+WORLD_SIZE=np.array([3,3,1]),
+N_OBSTACLES_STATIC=5,
+N_OBSTACLES_DYNAMIC=0,
+N_OBSTACLES_FALLING=0,
+N_OBSTACLES_PILLAR=3,
+N_OBSTACLES_CUBOID_FLOOR=10,
+N_OBSTACLES_CUBOID_CEILING=5,
+SPHERE_SIZE_ARRAY=np.array([0.05, 0.1, 0.15]),
+CUBOID_SIZE_ARRAY=np.array([0.05, 0.075, 0.1]),
+PILLAR_SIZE_ARRAY=np.array([0.05])
+
+# Debug functionality
 DEFAULT_USER_DEBUG_GUI = False
 MPC_TRAJECTORY = False
 
@@ -58,27 +70,42 @@ def run(
         control_freq_hz=DEFAULT_CONTROL_FREQ_HZ,
         duration_sec=DEFAULT_DURATION_SEC,
         output_folder=DEFAULT_OUTPUT_FOLDER,
-        colab=DEFAULT_COLAB
+        colab=DEFAULT_COLAB,
+        world_size=WORLD_SIZE,
+        n_obstacles_static=N_OBSTACLES_STATIC,
+        n_obstacles_dynamic=N_OBSTACLES_DYNAMIC,
+        n_obstacles_falling=N_OBSTACLES_FALLING,
+        n_obstacles_pillar=N_OBSTACLES_PILLAR,
+        n_obstacles_cuboid_floor=N_OBSTACLES_CUBOID_FLOOR,
+        n_obstacles_cuboid_ceiling=N_OBSTACLES_CUBOID_CEILING,
+        sphere_size_array=SPHERE_SIZE_ARRAY,
+        cuboid_size_array=CUBOID_SIZE_ARRAY,
+        pillar_size_array=PILLAR_SIZE_ARRAY
         ):
     #### Initialize the simulation #############################
     H = .1
     H_STEP = .05
     R = .3
-    INIT_XYZS = np.array([[R*np.cos((i/6)*2*np.pi+np.pi/2), R*np.sin((i/6)*2*np.pi+np.pi/2)-R, H+i*H_STEP] for i in range(num_drones)])
+
+    # Generate a start and goal position at opposite ends of the working volume
+    INIT_XYZS= (np.random.rand(3) * WORLD_SIZE - np.array([0.5, 0.5, 0]) * WORLD_SIZE) * 0.5
+    INIT_XYZS[0][0] = -0.4 * WORLD_SIZE[0][0]
+
+    TARGET_POS = ((np.random.rand(3) * WORLD_SIZE- np.array([0.5, 0.5, 0]) * WORLD_SIZE) * 0.5)[0]
+    TARGET_POS[0] = 0.4 * WORLD_SIZE[0][0]
+    TARGET_STATE = np.concatenate((TARGET_POS.copy(), np.array([0,0,0])))
+
     INIT_RPYS = np.array([[0, 0,  i * (np.pi/2)/num_drones] for i in range(num_drones)])
-    count = 150
     #### Initialize a circular trajectory ######################
     PERIOD = 10
     NUM_WP = control_freq_hz*PERIOD
-    TARGET_POS = np.zeros((NUM_WP,3))
-    for i in range(NUM_WP):
-        TARGET_POS[i, :] = R*np.cos((i/NUM_WP)*(2*np.pi)+np.pi/2)+INIT_XYZS[0, 0], R*np.sin((i/NUM_WP)*(2*np.pi)+np.pi/2)-R+INIT_XYZS[0, 1], 1
     wp_counters = np.array([int((i*NUM_WP/6)%NUM_WP) for i in range(num_drones)])
 
     #### Create the environment ################################
     env = CtrlAviary(drone_model=drone,
                         num_drones=num_drones,
                         initial_xyzs=INIT_XYZS,
+                        target_pos=TARGET_POS,
                         initial_rpys=INIT_RPYS,
                         physics=physics,
                         neighbourhood_radius=10,
@@ -90,8 +117,8 @@ def run(
                         user_debug_gui=user_debug_gui,
                         world_size=np.array([3,3,1]),
                         n_obstacles_static=5,
-                        n_obstacles_dynamic=10,
-                        n_obstacles_falling=5,
+                        n_obstacles_dynamic=0,
+                        n_obstacles_falling=0,
                         n_obstacles_pillar=3,
                         n_obstacles_cuboid_floor=10,
                         n_obstacles_cuboid_ceiling=5,
@@ -132,7 +159,7 @@ def run(
         # Visualization code for planner MPC
         if not used:
             used = True
-            dots = planner_MPC.compute_control(current_state_planner=obs[0], target_state=np.array([1.5,1.5,1.5, 0, 0, 0]))
+            dots = planner_MPC.compute_control(current_state_planner=obs[0], target_state=TARGET_STATE)
             dots = dots.T
             for dot_coords in dots:
                 id = p.createVisualShape(p.GEOM_SPHERE,
@@ -152,20 +179,19 @@ def run(
         
         for j in range(num_drones):
             particle_state_traj = planner_MPC.compute_control(current_state_planner=obs[j],
-                                               target_state=np.array([1.5, 1.5, 1.5, 0, 0, 0]))
+                                               target_state=TARGET_STATE)
             target_from_planner_pos = particle_state_traj.T[2, :3]
             target_from_planner_vel = particle_state_traj.T[2, 3:]
             action[j, :], pos_error, _, path = ctrl_MPC.computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
                                                                     state=obs[j],
-                                                                    target_pos=target_from_planner_pos,#np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2]]),
-                                                                    #target_pos=INIT_XYZS[j, :] + TARGET_POS[wp_counters[j], :],
+                                                                    target_pos=target_from_planner_pos,
                                                                     target_rpy=INIT_RPYS[j, :],
                                                                     target_vel=target_from_planner_vel
                                                                     )
 
             env._showDroneLocalAxes(j)
         # Extract target position for visualization
-        target_pos = target_pos=INIT_XYZS[j, :] + TARGET_POS[wp_counters[j], :]   
+        # target_pos = target_pos=INIT_XYZS[j, :] + TARGET_POS[wp_counters[j], :]   
         
         if MPC_TRAJECTORY:
         # Draw MPC path as a line 
@@ -180,27 +206,26 @@ def run(
             
             # Draw line to target position
             current_pos = obs[j][:3]  # Drone's current position (x, y, z)
-            target_pos = [-0.5,-0.5,0.5]
             target_line_id = p.addUserDebugLine(
                 lineFromXYZ=current_pos,
-                lineToXYZ=target_pos,
+                lineToXYZ=TARGET_POS,
                 lineColorRGB=[0, 1, 0],  # Green line
                 lineWidth=3
             )
             previous_debug_lines.append(target_line_id)
 
         #### Go to the next way point and loop #####################
-        for j in range(num_drones):
-            wp_counters[j] = wp_counters[j] + 1 if wp_counters[j] < (NUM_WP-1) else 0
+        # for j in range(num_drones):
+        #     wp_counters[j] = wp_counters[j] + 1 if wp_counters[j] < (NUM_WP-1) else 0
 
         #### Log the simulation ####################################
-        for j in range(num_drones):
-            logger.log(drone=j,
-                       timestamp=i/env.CTRL_FREQ,
-                       state=obs[j],
-                       control=np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2], INIT_RPYS[j, :], np.zeros(6)])
-                       #control=np.hstack([INIT_XYZS[j, :]+TARGET_POS[wp_counters[j], :], INIT_RPYS[j, :], np.zeros(6)])
-                       )
+        # for j in range(num_drones):
+        #     logger.log(drone=j,
+        #                timestamp=i/env.CTRL_FREQ,
+        #                state=obs[j],
+        #                control=np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2], INIT_RPYS[j, :], np.zeros(6)])
+        #                #control=np.hstack([INIT_XYZS[j, :]+TARGET_POS[wp_counters[j], :], INIT_RPYS[j, :], np.zeros(6)])
+        #                )
 
         #### Printout ##############################################
         env.render()

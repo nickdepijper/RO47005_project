@@ -28,6 +28,7 @@ class BaseAviary(gym.Env):
                 num_drones: int=1,
                 neighbourhood_radius: float=np.inf,
                 initial_xyzs=None,
+                target_pos=None,
                 initial_rpys=None,
                 physics: Physics=Physics.PYB,
                 pyb_freq: int = 120,
@@ -227,6 +228,9 @@ class BaseAviary(gym.Env):
             self.INIT_RPYS = initial_rpys
         else:
             print("[ERROR] invalid initial_rpys in BaseAviary.__init__(), try initial_rpys.reshape(NUM_DRONES,3)")
+        
+        ### Set target POS #########################################
+        self.TARGET_POS = target_pos
         #### Create action and observation spaces ##################
         self.action_space = self._actionSpace()
         self.observation_space = self._observationSpace()
@@ -1103,11 +1107,10 @@ class BaseAviary(gym.Env):
                                             visualFramePosition=[0, 0, 0],
                                             rgbaColor=[1, 0, 0, 0.5],
                                             )
-    
         p.createMultiBody(
                 baseMass=0,  # Mass 0 makes it static
                 baseVisualShapeIndex=start_marker_id,
-                basePosition=self.environment_description.startpos,  # Position in the world
+                basePosition=self.INIT_XYZS[0],  # Position in the world
                 baseOrientation=p.getQuaternionFromEuler([0, 0, 0])
         )
     
@@ -1121,7 +1124,7 @@ class BaseAviary(gym.Env):
         p.createMultiBody(
                 baseMass=0,  # Mass 0 makes it static
                 baseVisualShapeIndex=end_marker_id,
-                basePosition=self.environment_description.goalpos,  # Position in the world
+                basePosition=self.TARGET_POS,  # Position in the world
                 baseOrientation=p.getQuaternionFromEuler([0, 0, 0])
             )
 
