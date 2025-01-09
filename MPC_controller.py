@@ -85,7 +85,7 @@ class SimpleMPC:
         constraints += [x[:, 0] == current_state.flatten()]
         # For each stage in the MPC horizon
         u_target=np.array([self.m*9.81/4,self.m*9.81/4,self.m*9.81/4,self.m*9.81/4])
-        Q = np.diag([20, 20, 10, 1, 1, 1, 1, 1, 10, 1, 1, 1])  # High weight on position/orientation
+        Q = np.diag([40, 40, 10, 1, 1, 1, 1, 1, 10, 1, 1, 1])  # High weight on position/orientation
         R = 0.1 * np.eye(4)  # Lower weight on control effort
         filtered_obstacles = []
         # Filter obstacles based on distance to the drone
@@ -168,8 +168,8 @@ class SimpleMPC:
             Total quadratic cost from nearby obstacles.
         """
         costs = 0.0  # Initialize cost
-        M = 3.0  # Scaling factor for cost
-        distance_threshold = 1  # Threshold distance for cost calculation
+        M = 1.4  # Scaling factor for cost
+        distance_threshold = 0.1  # Threshold distance for cost calculation
         
 
         for obs in obstacles:
@@ -198,11 +198,16 @@ class SimpleMPC:
                 corner_position = obstacle_center + offset
 
                 # Compute the squared distance
-                squared_distance = cp.sum_squares(drone_pos - corner_position)
-
+                distance = drone_pos - corner_position
+                distance = cp.hstack([distance[:2], 0])
+                new_corner = corner_position - distance - distance
+                squared_distance = cp.sum_squares(drone_pos - new_corner)
+                
                 # Add quadratic cost only if distance is within the threshold
-
                 costs += M * squared_distance
+            #costs += cp.quad_form((squared_distance), np.eye(3))
+
+
 
         return costs
 
