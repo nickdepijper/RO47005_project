@@ -168,8 +168,8 @@ class SimpleMPC:
             Total quadratic cost from nearby obstacles.
         """
         costs = 0.0  # Initialize cost
-        M = 1.4  # Scaling factor for cost
-        distance_threshold = 0.1  # Threshold distance for cost calculation
+        M = 0.1  # Scaling factor for cost
+        distance_threshold = 0.17  # Threshold distance for cost calculation
         
 
         for obs in obstacles:
