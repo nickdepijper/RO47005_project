@@ -100,11 +100,11 @@ class SimpleMPC:
             distance = np.linalg.norm(obstacle_position - drone_position)
             
             # Check if the obstacle is within range
-            if distance < 2:
+            if distance < 1:
                 filtered_obstacles.append(obstacle_position)
 
 
-        A_obs,b_obs=self.convexify(current_state[:3], 0.005, filtered_obstacles)
+        A_obs,b_obs, points=self.convexify(current_state[:3], 0.005, filtered_obstacles)
         x_intergoal = self.get_intermediate_goal(current_state[:3].flatten(), 0,target_state[:3].flatten(), A_obs,b_obs).flatten()[0:3]
         
         target_state = np.hstack([x_intergoal,target_state[3:]])
@@ -143,7 +143,7 @@ class SimpleMPC:
         problem = cp.Problem(cp.Minimize(cost), constraints)
         problem.solve(solver=cp.OSQP, verbose=False) # solver=cp.OSQP
         # We return the MPC input
-        return u[:, 0].value, x[:3, :].value
+        return u[:, 0].value, x[:3, :].value , points
     
     def split_obstacles(self, obstacles):
         """Splits obstacles into dynamic and static ones"""
@@ -257,13 +257,15 @@ class SimpleMPC:
     def convexify(self,p,r_drone,obstacle_list):
         A=[]
         b=[]
+        points = []
         for obstacle in obstacle_list:
             p_obs=obstacle[:3]
             r_obs= 0.001 #obstacle[2]
             A_obs,b_obs=self.get_coeff(p,r_drone,p_obs,r_obs)
             A.append(A_obs)
             b.append(b_obs)
-        return np.array(A),np.array(b)
+            points.append( p_obs + (r_drone + r_obs) * (p - p_obs) / np.linalg.norm(p - p_obs))
+        return np.array(A),np.array(b), points
 
     def get_intermediate_goal(self, pos,r_drone, goal_pos, A,b):
         new_b=self.get_new_constraints(pos,r_drone, goal_pos, A,b)
@@ -327,7 +329,7 @@ class DSLMPCControl(BaseControl):
                                     ])
 
         # Initialize MPC
-        self.mpc = SimpleMPC(horizon=50, timestep=1/60, m=0.027, g=g, Ixx=1.4e-5, Iyy=1.4e-5, Izz=2.17e-5, obstacles=obstacles)
+        self.mpc = SimpleMPC(horizon=100, timestep=1/60, m=0.027, g=g, Ixx=1.4e-5, Iyy=1.4e-5, Izz=2.17e-5, obstacles=obstacles)
 
     def computeControl(self,
                        control_timestep,
@@ -345,7 +347,7 @@ class DSLMPCControl(BaseControl):
         #target_state = np.hstack(([0,0,5], target_rpy, target_vel, target_rpy_rates))
 
         # Compute MPC control inputs
-        thrusts, path = self.mpc.compute_control(current_state, target_state)
+        thrusts, path, points = self.mpc.compute_control(current_state, target_state)
         #thrusts = np.clip(thrusts, 0, self.MAX_PWM / self.PWM2RPM_SCALE)
         rpms = []
         
@@ -359,6 +361,6 @@ class DSLMPCControl(BaseControl):
         pos_error = target_pos - cur_pos
         yaw_error = target_rpy[2] - p.getEulerFromQuaternion(cur_quat)[2]
 
-        return rpms, pos_error, yaw_error, path
+        return rpms, pos_error, yaw_error, path, points
 
 
