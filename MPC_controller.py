@@ -74,6 +74,8 @@ class SimpleMPC:
 
     def compute_control(self, current_state, target_state):
            # Weight on the input
+
+
         cost = 0.
         constraints = []
 
@@ -98,9 +100,14 @@ class SimpleMPC:
             distance = np.linalg.norm(obstacle_position - drone_position)
             
             # Check if the obstacle is within range
-            if distance < 1:
-                filtered_obstacles.append(obs)
+            if distance < 1.0:
+                filtered_obstacles.append(obstacle_position)
 
+
+        A_obs,b_obs=self.convexify(current_state[:2], 0.05, filtered_obstacles)
+        x_intergoal = self.get_intermediate_goal(current_state[:2].flatten(), 0,target_state[:2].flatten(), A_obs,b_obs).flatten()[0:2]
+        
+        target_state = np.hstack([x_intergoal,target_state[2:]])
 
         for n in range(self.horizon):
             cost += (cp.quad_form((x[:,n+1]-target_state),Q)  + cp.quad_form(u[:,n]-u_target, R))
@@ -116,16 +123,16 @@ class SimpleMPC:
             # constraints += [u[:, n] >= -0.07 * 30]
             # constraints += [u[:, n] <= 0.07 * 30]
             #Obstacle avoidance
-            # constraints += [A_obs @ x[:2,n] <= b_obs.flatten()]
+            constraints += [A_obs @ x[:2,n] <= b_obs.flatten()]
             #print(self.static_obstacles)
             
 
             
 
             # Add obstacle costs if there are any filtered obstacles
-            if len(filtered_obstacles) > 0:  # Check if there are close obstacles
-                obstacle_cost = self.get_obstacle_costs(x[:3, n + 1], filtered_obstacles)
-                cost += obstacle_cost
+            #if len(filtered_obstacles) > 0:  # Check if there are close obstacles
+            #    obstacle_cost = self.get_obstacle_costs(x[:3, n + 1], filtered_obstacles)
+            #    cost += obstacle_cost
 
         # Solves the problem
         problem = cp.Problem(cp.Minimize(cost), constraints)
@@ -205,6 +212,55 @@ class SimpleMPC:
                 costs += M * squared_distance
 
         return costs
+
+    def get_coeff(self,p,r_drone,p_obs,r_obs):
+
+        point=p_obs+(r_drone+r_obs)*(p-p_obs)/np.linalg.norm(p-p_obs)
+        a=-(p-p_obs)[0]/(p-p_obs)[1]
+        b=point[1]-a*point[0]
+        A=np.array([-a,1])
+        if np.dot(A,p) > b:
+            A=-A
+            b=-b
+        A+=np.random.normal(0, 0.01, 1)
+        return A,b
+
+    def convexify(self,p,r_drone,obstacle_list):
+        A=[]
+        b=[]
+        for obstacle in obstacle_list:
+            p_obs=obstacle[:2]
+            r_obs= 0.1 #obstacle[2]
+            A_obs,b_obs=self.get_coeff(p,r_drone,p_obs,r_obs)
+            A.append(A_obs)
+            b.append(b_obs)
+        return np.array(A),np.array(b)
+
+    def get_intermediate_goal(self, pos,r_drone, goal_pos, A,b):
+        new_b=self.get_new_constraints(pos,r_drone, goal_pos, A,b)
+
+
+        cost = 0.
+        constraints = []
+        
+        # Create the optimization variables
+        x = cp.Variable((2, 1)) 
+        # Add constraints
+        constraints+=[A[:,:]@x<=new_b[:,np.newaxis]]
+
+        #Cost is distance to goal
+        cost+=cp.sum_squares(x-goal_pos[:,np.newaxis])
+
+        problem = cp.Problem(cp.Minimize(cost), constraints)
+        problem.solve()
+        return x.value
+
+    def get_new_constraints(self, pos,r_drone, goal_pos, A,b):
+        new_b=[]
+        for i in range(len(b)):
+            new_b.append(b[i]-r_drone/(np.sin(np.arctan(1/np.abs(A[i,0])))))
+
+        return np.array(new_b)
 
 
 
