@@ -173,6 +173,7 @@ def run(
                 elapsed_time = time.time() - start_time
                 print(f"Drone {j} died after {elapsed_time:.2f} seconds.")
                 env.close()
+                p.disconnect()
                 return elapsed_time
         # Visualization code for planner MPC, if it is used
         # if MPC_POINT:
@@ -274,8 +275,6 @@ def run(
     env.close()
 
     #### Save the simulation results ###########################
-    logger.save()
-    logger.save_as_csv("mpc") # Optional CSV save
 
     #### Plot the simulation results ###########################
     if plot:

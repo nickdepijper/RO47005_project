@@ -1128,66 +1128,6 @@ class BaseAviary(gym.Env):
                 baseOrientation=p.getQuaternionFromEuler([0, 0, 0])
             )
 
-        """
-        # legacy code. DO NOT REMOVE -max
-        # Initialise obstacles / arena parameters
-        n_objects = 20 # Amount of obstacles to add
-        world_size = np.array([3, 3, 1]) # World size. Box of size x, y, z centered on (0,0)
-        object_ids = np.zeros(n_objects).astype(int) # Store references to obstacles in array
-
-        # For n objects, generate a sphere with collision
-        for i in range(n_objects):
-            # Generate a sphere in a random place in the world
-            position = np.random.rand(3)*world_size - [0.5, 0.5, 0] * world_size
-            collision_shape = p.createCollisionShape(p.GEOM_SPHERE, radius=0.1)
-            object_ids[i] = p.createMultiBody(
-            baseMass=0,  # Setting mass to 0 disables physics (but not collisions)
-            baseCollisionShapeIndex=collision_shape,
-            basePosition=position,
-            baseOrientation=p.getQuaternionFromEuler([0, 0, 0]),
-            physicsClientId=self.CLIENT
-            )
-
-            # Set colour of current obstacle to grey
-            p.changeVisualShape(
-                object_ids[i],
-               -1,  # Link index (-1 for base)
-                rgbaColor=[0.3, 0.3, 0.3, 1]  # RGBA
-            )
-
-        # Create a red marker at the start position of the drone
-        start_position = (np.random.rand(3) * world_size - [0.5, 0.5, 0] * world_size) * 0.5
-        start_position[0] = -0.5 * world_size[0]
-        start_marker_id = p.createVisualShape(p.GEOM_SPHERE,
-                            radius=0.05,
-                            visualFramePosition=[0, 0, 0],
-                            rgbaColor=[1, 0, 0, 0.5],
-        )
-
-        p.createMultiBody(
-            baseMass=0,  # Mass 0 makes it static
-            baseVisualShapeIndex=start_marker_id,
-            basePosition=start_position,  # Position in the world
-            baseOrientation=p.getQuaternionFromEuler([0, 0, 0])
-        )
-
-
-        # Create a green marker at the end position of the drone
-        start_position = (np.random.rand(3) * world_size - [0.5, 0.5, 0] * world_size) * 0.5
-        start_position[0] = 0.5 * world_size[0]
-        start_marker_id = p.createVisualShape(p.GEOM_SPHERE,
-                            radius=0.05,
-                            visualFramePosition=[0, 0, 0],
-                            rgbaColor=[0, 1, 0, 0.5],
-        )
-
-        p.createMultiBody(
-            baseMass=0,  # Mass 0 makes it static
-            baseVisualShapeIndex=start_marker_id,
-            basePosition=start_position,  # Position in the world
-            baseOrientation=p.getQuaternionFromEuler([0, 0, 0])
-        )
-        """
     ################################################################################
 
     def _parseURDFParameters(self):
