@@ -26,12 +26,11 @@ from gym_pybullet_drones.envs.CtrlAviary import CtrlAviary
 from gym_pybullet_drones.utils.Logger import Logger
 from gym_pybullet_drones.utils.utils import sync, str2bool
 
-from mpc import DSLMPCControl, MPCPlanner
+from mpc import DSLMPCControl #, MPCPlanner
 
 DEFAULT_DRONES = DroneModel("cf2p")
 DEFAULT_NUM_DRONES = 1
 DEFAULT_PHYSICS = Physics("pyb")
-DEFAULT_GUI = True
 DEFAULT_RECORD_VISION = False
 DEFAULT_PLOT = True
 DEFAULT_OBSTACLES = True
@@ -54,6 +53,7 @@ CUBOID_SIZE_ARRAY=np.array([0.05, 0.075, 0.1])
 PILLAR_SIZE_ARRAY=np.array([0.05])
 
 # Debug functionality
+DEFAULT_GUI = False
 DEFAULT_USER_DEBUG_GUI = False
 MPC_TRAJECTORY = False
 
@@ -143,10 +143,10 @@ def run(
 
     #### Initialize the controllers ############################
     if MPC_DRONE:
-        ctrl_MPC = DSLMPCControl(drone_model=drone, horizon=10, timestep=1/60, obstacles=env.environment_description.obstacles)
+        ctrl_MPC = DSLMPCControl(drone_model=drone, horizon=40, timestep=1/60, obstacles=env.environment_description.obstacles)
     
-    if MPC_POINT:
-        planner_MPC = MPCPlanner(horizon=20, timestep=1, m=0.027, g=9.81)
+    # if MPC_POINT:
+    #     planner_MPC = MPCPlanner(horizon=20, timestep=1, m=0.027, g=9.81)
 
     previous_debug_lines = []
 
@@ -154,6 +154,8 @@ def run(
     action = np.zeros((num_drones,4))
     START = time.time()
     used = False
+    start_time = time.time()
+    average_calc_time = 0
     for i in range(0, int(duration_sec*env.CTRL_FREQ)):
 
         #### Step the simulation ###################################
@@ -164,33 +166,42 @@ def run(
         previous_debug_lines = []
 
         # Visualization code for planner MPC, if it is used
-        if MPC_POINT:
-            if not used:
-                used = True
-                dots = planner_MPC.compute_control(current_state_planner=obs[0], target_state=TARGET_STATE)
-                dots = dots.T
-                for dot_coords in dots:
-                    id = p.createVisualShape(p.GEOM_SPHERE,
-                                                    radius=0.02,
-                                                    visualFramePosition=[0, 0, 0],
-                                                    rgbaColor=[0, 1, 0, 0.5],
-                                                    )
-                    p.createMultiBody(
-                        baseMass=0,  # Setting mass to 0 disables physics (but not collisions)
-                        baseVisualShapeIndex=id,
-                        basePosition=dot_coords[:3],
-                        baseOrientation=p.getQuaternionFromEuler([0, 0, 0]),
-                        physicsClientId=env.CLIENT
-                            )
+        # if MPC_POINT:
+        #     if not used:
+        #         used = True
+        #         dots = planner_MPC.compute_control(current_state_planner=obs[0], target_state=TARGET_STATE)
+        #         dots = dots.T
+        #         for dot_coords in dots:
+        #             id = p.createVisualShape(p.GEOM_SPHERE,
+        #                                             radius=0.02,
+        #                                             visualFramePosition=[0, 0, 0],
+        #                                             rgbaColor=[0, 1, 0, 0.5],
+        #                                             )
+        #             p.createMultiBody(
+        #                 baseMass=0,  # Setting mass to 0 disables physics (but not collisions)
+        #                 baseVisualShapeIndex=id,
+        #                 basePosition=dot_coords[:3],
+        #                 baseOrientation=p.getQuaternionFromEuler([0, 0, 0]),
+        #                 physicsClientId=env.CLIENT
+        #                     )
 
         #### Compute control for the current way point ############# 
         
         for j in range(num_drones):
-            if MPC_POINT:
-                particle_state_traj = planner_MPC.compute_control(current_state_planner=obs[j],
-                                                target_state=TARGET_STATE)
-                target_from_planner_pos = particle_state_traj.T[2, :3]
-                target_from_planner_vel = particle_state_traj.T[2, 3:]
+            distance_to_goal = np.linalg.norm(obs[j][:3] - TARGET_POS)
+            if distance_to_goal < 0.1:  # Drone reached the goal
+                elapsed_time = time.time() - start_time
+                print(f"Drone {j} reached the goal in {elapsed_time:.2f} seconds.")
+                env.close()
+                return elapsed_time
+            
+            calc_start = time.time() 
+
+            # if MPC_POINT:
+            #     particle_state_traj = planner_MPC.compute_control(current_state_planner=obs[j],
+            #                                     target_state=TARGET_STATE)
+            #     target_from_planner_pos = particle_state_traj.T[2, :3]
+            #     target_from_planner_vel = particle_state_traj.T[2, 3:]
             
             if MPC_DRONE:
                 action[j, :], pos_error, _, path = ctrl_MPC.computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
@@ -199,7 +210,11 @@ def run(
                                                                         target_rpy=INIT_RPYS[j, :],
                                                                         target_vel=TARGET_STATE[3:]
                                                                         )
+            calc_end = time.time()
+            average_calc_time += (calc_end - calc_start) / int(duration_sec*env.CTRL_FREQ)
 
+            
+            
             env._showDroneLocalAxes(j)
         # Extract target position for visualization
         # target_pos = target_pos=INIT_XYZS[j, :] + TARGET_POS[wp_counters[j], :]   
@@ -246,33 +261,53 @@ def run(
             sync(i, START, env.CTRL_TIMESTEP)
 
     #### Close the environment #################################
+    print(f"Average control calculation time: {average_calc_time:.4f} seconds")
     env.close()
 
     #### Save the simulation results ###########################
     logger.save()
-    logger.save_as_csv("pid") # Optional CSV save
+    logger.save_as_csv("mpc") # Optional CSV save
 
     #### Plot the simulation results ###########################
     if plot:
         logger.plot()
+    
+    p.disconnect()
+    return time.time() - start_time
+
 
 if __name__ == "__main__":
     #### Define and parse (optional) arguments for the script ##
-    parser = argparse.ArgumentParser(description='Helix flight script using CtrlAviary and MPC Control & Planner')
-    parser.add_argument('--drone',              default=DEFAULT_DRONES,     type=DroneModel,    help='Drone model (default: CF2X)', metavar='', choices=DroneModel)
-    parser.add_argument('--num_drones',         default=DEFAULT_NUM_DRONES,          type=int,           help='Number of drones (default: 3)', metavar='')
-    parser.add_argument('--physics',            default=DEFAULT_PHYSICS,      type=Physics,       help='Physics updates (default: PYB)', metavar='', choices=Physics)
-    parser.add_argument('--gui',                default=DEFAULT_GUI,       type=str2bool,      help='Whether to use PyBullet GUI (default: True)', metavar='')
-    parser.add_argument('--record_video',       default=DEFAULT_RECORD_VISION,      type=str2bool,      help='Whether to record a video (default: False)', metavar='')
-    parser.add_argument('--plot',               default=DEFAULT_PLOT,       type=str2bool,      help='Whether to plot the simulation results (default: True)', metavar='')
-    parser.add_argument('--user_debug_gui',     default=DEFAULT_USER_DEBUG_GUI,      type=str2bool,      help='Whether to add debug lines and parameters to the GUI (default: False)', metavar='')
-    parser.add_argument('--obstacles',          default=DEFAULT_OBSTACLES,       type=str2bool,      help='Whether to add obstacles to the environment (default: True)', metavar='')
-    parser.add_argument('--simulation_freq_hz', default=DEFAULT_SIMULATION_FREQ_HZ,        type=int,           help='Simulation frequency in Hz (default: 240)', metavar='')
-    parser.add_argument('--control_freq_hz',    default=DEFAULT_CONTROL_FREQ_HZ,         type=int,           help='Control frequency in Hz (default: 48)', metavar='')
-    parser.add_argument('--duration_sec',       default=DEFAULT_DURATION_SEC,         type=int,           help='Duration of the simulation in seconds (default: 5)', metavar='')
-    parser.add_argument('--output_folder',     default=DEFAULT_OUTPUT_FOLDER, type=str,           help='Folder where to save logs (default: "results")', metavar='')
-    parser.add_argument('--colab',              default=DEFAULT_COLAB, type=bool,           help='Whether example is being run by a notebook (default: "False")', metavar='')
+    parser = argparse.ArgumentParser(description='Simulation script using CtrlAviary and MPC Control & Planner')
+    parser.add_argument('--drone',              default=DEFAULT_DRONES,                 type=DroneModel,    help='Drone model (default: CF2X)', metavar='', choices=DroneModel)
+    parser.add_argument('--num_drones',         default=DEFAULT_NUM_DRONES,             type=int,           help='Number of drones (default: 3)', metavar='')
+    parser.add_argument('--physics',            default=DEFAULT_PHYSICS,                type=Physics,       help='Physics updates (default: PYB)', metavar='', choices=Physics)
+    parser.add_argument('--gui',                default=DEFAULT_GUI,                    type=str2bool,      help='Whether to use PyBullet GUI (default: True)', metavar='')
+    parser.add_argument('--record_video',       default=DEFAULT_RECORD_VISION,          type=str2bool,      help='Whether to record a video (default: False)', metavar='')
+    parser.add_argument('--plot',               default=DEFAULT_PLOT,                   type=str2bool,      help='Whether to plot the simulation results (default: True)', metavar='')
+    parser.add_argument('--user_debug_gui',     default=DEFAULT_USER_DEBUG_GUI,         type=str2bool,      help='Whether to add debug lines and parameters to the GUI (default: False)', metavar='')
+    parser.add_argument('--obstacles',          default=DEFAULT_OBSTACLES,              type=str2bool,      help='Whether to add obstacles to the environment (default: True)', metavar='')
+    parser.add_argument('--simulation_freq_hz', default=DEFAULT_SIMULATION_FREQ_HZ,     type=int,           help='Simulation frequency in Hz (default: 240)', metavar='')
+    parser.add_argument('--control_freq_hz',    default=DEFAULT_CONTROL_FREQ_HZ,        type=int,           help='Control frequency in Hz (default: 48)', metavar='')
+    parser.add_argument('--duration_sec',       default=DEFAULT_DURATION_SEC,           type=int,           help='Duration of the simulation in seconds (default: 5)', metavar='')
+    parser.add_argument('--output_folder',      default=DEFAULT_OUTPUT_FOLDER,          type=str,           help='Folder where to save logs (default: "results")', metavar='')
+    parser.add_argument('--colab',              default=DEFAULT_COLAB,                  type=bool,          help='Whether example is being run by a notebook (default: "False")', metavar='')
+    parser.add_argument('--max_runs',           default=5,                              type=int,           help='Maximum number of simulation runs', metavar='')
     ARGS = parser.parse_args()
 
-    #run(**vars(ARGS))
-    run()
+    #### Exclude `max_runs` from `ARGS` ####
+    run_args = vars(ARGS).copy()
+    run_args.pop('max_runs')
+
+    #### Run multiple simulations ####
+    for run_index in range(ARGS.max_runs):
+        print(f"Starting run {run_index + 1} / {ARGS.max_runs}")
+        try:
+            elapsed_time = run(**run_args)  # Pass filtered arguments
+            print(f"Run {run_index + 1} completed in {elapsed_time:.2f} seconds.\n")
+        except Exception as e:
+            print(f"Run {run_index + 1} failed with error: {e}")
+
+    print("All runs completed.")
+
+

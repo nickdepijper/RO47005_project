@@ -4,119 +4,6 @@ import pybullet as p
 from gym_pybullet_drones.control.BaseControl import BaseControl
 from gym_pybullet_drones.utils.enums import DroneModel
 
-
-class MPCController:
-    def __init__(self, horizon=500, timestep=1/60, m=0.027, g=9.8, Ixx=1.4e-5, Iyy=1.4e-5, Izz=2.17e-5):
-        self.horizon = horizon
-        self.timestep = timestep
-        self.m = m
-        self.g = g
-        self.Ixx = Ixx
-        self.Iyy = Iyy
-        self.Izz  = Izz
-        CD = 7.9379e-12
-        CT = 3.1582e-10
-        L = 39.73e-3
-        gamma_torque = CD/(CT*Izz)
-
-        """
-        Define model parameters and state space for linear quadrotor dynamics
-        """
-        self.arm_length      = L  # meters
-        g = 9.81 # m/s^2
-
-        """
-        Continuous state space with yawing
-        state = [x y z dx dy dz phi theta phi_dot theta_dot xi_dot]
-        dot_state = [dx dy dz ddx ddy ddz phi_dot theta_dot phi_ddot theta_ddot xi_ddot]
-        u = [F1 F2 F3 F4]
-        """
-        #                     x  y  z  dx dy dz phi theta   xi   phi_dot theta_dot  xi_dot
-        self.A_c = np.array([[0, 0, 0, 1, 0, 0, 0,  0,      0,    0,      0,        0 ],    #dx
-                             [0, 0, 0, 0, 1, 0, 0,  0,      0,    0,      0,        0 ],    #dy
-                             [0, 0, 0, 0, 0, 1, 0,  0,      0,    0,      0,        0 ],    #dz
-                             [0, 0, 0, 0, 0, 0, 0,  g,      0,    0,      0,        0 ],    #ddx
-                             [0, 0, 0, 0, 0, 0, -g, 0,      0,    0,      0,        0 ],    #ddy
-                             [0, 0, 0, 0, 0, 0, 0,  0,      0,    0,      0,        0 ],    #ddz
-                             [0, 0, 0, 0, 0, 0, 0,  0,      0,    1,      0,        0 ],    #phi_dot
-                             [0, 0, 0, 0, 0, 0, 0,  0,      0,    0,      1,        0 ],    #theta_dot
-                             [0, 0, 0, 0, 0, 0, 0,  0,      0,    0,      0,        1 ],    #xi_dot
-                             [0, 0, 0, 0, 0, 0, 0,  0,      0,    0,      0,        0 ],    #phi_ddot
-                             [0, 0, 0, 0, 0, 0, 0,  0,      0,    0,      0,        0 ],    #theta_ddot
-                             [0, 0, 0, 0, 0, 0, 0,  0,      0,    0,      0,        0 ]])   #xi_ddot
-
-        self.B_c = np.array([[0, 0, 0, 0], #dx
-                             [0, 0, 0, 0], #dy
-                             [0, 0, 0, 0], #dz
-                             [0, 0, 0, 0], #ddx
-                             [0, 0, 0, 0], #ddy
-                             [1/self.m, 1/self.m, 1/self.m, 1/self.m], #ddz
-                             [0, 0, 0, 0],           #phi_dot
-                             [0, 0, 0, 0],           #theta_dot
-                             [0, 0, 0, 0],  # xi_dot
-                             [0, L/self.Ixx, 0, -L/self.Ixx],  #phi_ddot
-                             [-L/self.Iyy, 0, L/self.Iyy, 0],  #theta_ddot
-                             [-gamma_torque, gamma_torque, -gamma_torque, gamma_torque]  # xi_ddot
-                             ])
-        self.C_c = np.identity(12)
-        self.D_c = np.zeros((1,4))
-
-        # Discretization state space
-        self.A = np.eye(12) + self.A_c * self.timestep
-        self.B = self.B_c * self.timestep
-        self.C = self.C_c
-        self.D = self.D_c
-
-
-    def compute_control(self, current_state, target_state):
-           # Weight on the input
-        cost = 0.
-        constraints = []
-
-        # Create the optimization variables
-        x = cp.Variable((12, self.horizon + 1)) # cp.Variable((dim_1, dim_2))
-        u = cp.Variable((4, self.horizon))
-
-        # Initial state
-        constraints += [x[:, 0] == current_state.flatten()]
-
-        # For each stage in the MPC horizon
-        u_target=np.array([self.m*9.81/4,self.m*9.81/4,self.m*9.81/4,self.m*9.81/4])
-        Q = np.diag([150, 150, 100, 1, 1, 10, 1, 1, 10, 1, 1, 1])  # High weight on position/orientation
-        R = 0.01 * np.eye(4)  # Lower weight on control effort
-        for n in range(self.horizon):
-            cost += (cp.quad_form((x[:,n+1]-target_state),Q)  + cp.quad_form(u[:,n]-u_target, R))
-            constraints += [x[:,n+1] == self.A @ x[:,n] + self.B @ u[:,n]]
-            # State and input constraints
-            #constraints += [x[3, n + 1] <= 1]
-            #constraints += [x[4, n + 1] <= 1]
-            #constraints += [x[5, n + 1] <= 1]
-            #constraints += [x[6, n + 1] <= 0.6]
-            #constraints += [x[7, n + 1] <= 0.6]
-            constraints += [x[8, n + 1] <= 0.3]
-            #constraints += [x[3, n + 1] >= -1]
-            #constraints += [x[4, n + 1] >= -1]
-            #constraints += [x[4, n + 1] >= -1]
-            #constraints += [x[6, n + 1] >= -0.6]
-            #constraints += [x[7, n + 1] >= -0.6]
-            constraints += [x[8, n + 1] >= -0.3]
-
-            #constraints += [u[:, n] >= -0.07 * 30]
-            #constraints += [u[:, n] <= 0.07 * 30]
-
-            #Obstacle avoidance
-            #constraints += [A_obs @ x[:2,n] <= b_obs.flatten()]
-
-
-
-
-        # Solves the problem
-        problem = cp.Problem(cp.Minimize(cost), constraints)
-        problem.solve(solver=cp.OSQP, verbose=False) # solver=cp.OSQP
-        # We return the MPC input
-        return u[:, 0].value, x[:3, :].value
-
-
 class SimpleMPC:
     def __init__(self, horizon=500, timestep=1/60, m=0.027, g=9.8, Ixx=1.4e-5, Iyy=1.4e-5, Izz=2.17e-5, obstacles=None):
         self.horizon = horizon
@@ -214,11 +101,11 @@ class SimpleMPC:
 
 
 
-        A_obs, b_obs=self.convexify(current_state[:3], 0.05, filtered_obstacles)
-        x_intergoal = self.get_intermediate_goal(current_state[:3].flatten(), 0.005 ,target_state[:3].flatten(), A_obs,b_obs).flatten()[0:3]
+        A_obs, b_obs=self.convexify(current_state[:3], 0.07, filtered_obstacles)
+        x_intergoal = self.get_intermediate_goal(current_state[:3].flatten(), 0.07 ,target_state[:3].flatten(), A_obs,b_obs).flatten()[0:3]
         target_state = np.hstack([x_intergoal,target_state[3:]])
 
-        print(x_intergoal)
+        #print(x_intergoal)
 
         #Obstacle avoidance
         #print("A_obstacle is this: " , A_obs, "     ", b_obs)
@@ -354,7 +241,7 @@ class SimpleMPC:
 
         
         # Calculate the plane constant b
-        b = -np.dot(normal, point)
+        b = np.dot(normal, point)
         
         # For CVXPY, A is just the normal vector (1x3) and b is a scalar
         A = normal #.reshape(1, -1)  # Reshape to 1x3 for CVXPY compatibility
@@ -378,8 +265,8 @@ class SimpleMPC:
 
     def get_intermediate_goal(self, pos,r_drone, goal_pos, A, b):
         if len(A) > 0:
-            new_b=self.get_new_constraints(pos,r_drone, goal_pos, A,b)
-
+            #new_b=self.get_new_constraints(pos,r_drone, goal_pos, A,b)
+            new_b=b
             cost = 0.
             constraints = []
 
@@ -391,6 +278,8 @@ class SimpleMPC:
             #print("new_b is this", np.shape(b[:,np.newaxis]))
             #print("new_A is this", np.shape((A[:,:]@x)))
             constraints+=[A@x<=new_b[:,np.newaxis]]
+
+            constraints+=[x[2] >= 0]
 
             #Cost is distance to goal
             cost+=cp.sum_squares(x-goal_pos[:,np.newaxis])
@@ -409,10 +298,8 @@ class SimpleMPC:
             new_b.append(b[i]-r_drone/(np.sin(np.arctan(1/np.abs(A[i,0])))))
         return np.array(new_b)
 
-
-
 class DSLMPCControl(BaseControl):
-    def __init__(self, drone_model: DroneModel, g: float = 9.8, horizon=40, timestep=1/60, obstacles=None):
+    def __init__(self, drone_model: DroneModel, g: float = 9.8, horizon=20, timestep=1/60, obstacles=None):
         self.PWM2RPM_SCALE = 0.2685
         self.PWM2RPM_CONST = 4070.3
         self.MIN_PWM = 10000
@@ -449,12 +336,15 @@ class DSLMPCControl(BaseControl):
                        ):
         current_state = np.hstack((cur_pos, cur_vel, p.getEulerFromQuaternion(cur_quat), cur_ang_vel))
         target_state = np.hstack((target_pos, target_vel, target_rpy, target_rpy_rates))
+        #target_state = np.hstack(([0,0,5], target_rpy, target_vel, target_rpy_rates))
 
         # Compute MPC control inputs
         thrusts, path = self.mpc.compute_control(current_state, target_state)
+        #thrusts = np.clip(thrusts, 0, self.MAX_PWM / self.PWM2RPM_SCALE)
         rpms = []
         
         for thrust in thrusts:
+            #print("thrust isssssssssssss",thrust)
             if thrust < 0:
                 rpm = -np.sqrt(-thrust / self.KF)  # radians per second
             else: rpm = np.sqrt(thrust / self.KF)  # radians per second
@@ -464,72 +354,3 @@ class DSLMPCControl(BaseControl):
         yaw_error = target_rpy[2] - p.getEulerFromQuaternion(cur_quat)[2]
 
         return rpms, pos_error, yaw_error, path
-
-
-class MPCPlanner:
-    def __init__(self, horizon=500, timestep=1/10, m=0.027, g=9.81):
-        self.horizon = horizon
-        self.timestep = timestep
-        self.m = m
-        self.g = g
-
-        """
-        Continuous state space without considering yawing(assuming yaw angle is 0 across time)
-        state = [x y z dx dy dz]
-        dot_state = [dx dy dz ddx ddy ddz]
-        u = [ddx, ddy, ddz]
-        """
-
-        self.A_c = np.zeros((6,6))
-        self.A_c[:3, 3:] = np.eye(3)
-        self.B_c = np.vstack((np.zeros((3, 3)), np.eye(3)))
-        self.C_c = np.eye(6)
-        self.D_c = np.zeros((1,6))
-
-        # Discretization state space
-        self.A = np.eye(6) + self.A_c * self.timestep
-        self.B = self.B_c * self.timestep
-        self.C = self.C_c
-        self.D = self.D_c
-
-    def compute_control(self, current_state_planner, target_state):
-        # Weight on the input
-        current_state_planner = current_state_planner[:6]
-        cost = 0.
-        constraints = []
-
-        # Create the optimization variables
-        x = cp.Variable((6, self.horizon + 1)) # cp.Variable((dim_1, dim_2))
-        u = cp.Variable((3, self.horizon))
-
-        # Initial state
-        constraints += [x[:, 0] == current_state_planner.flatten()]
-
-        # For each stage in the MPC horizon
-        Q = np.diag([1, 1, 1, 1, 1, 10])  # High weight on position/orientation
-        R = np.eye(3)  # Lower weight on control effort
-
-        for n in range(self.horizon):
-            cost += (cp.quad_form((x[:,n+1]-target_state),Q)  + cp.quad_form(u[:,n], R))
-            constraints += [x[:,n+1] == self.A @ x[:,n] + self.B @ u[:,n]]
-
-            # State and input constraints
-            constraints += [x[3, n + 1] <= 5]
-            constraints += [x[4, n + 1] <= 5]
-            constraints += [x[5, n + 1] <= 5]
-            constraints += [x[3, n + 1] >= -5]
-            constraints += [x[4, n + 1] >= -5]
-            constraints += [x[5, n + 1] >= -5]
-
-            constraints += [u[:, n] >= -10.1]
-            constraints += [u[:, n] <= 10.1]
-
-            #Obstacle avoidance
-            #constraints += [A_obs @ x[:2,n] <= b_obs.flatten()]
-
-        # Solve the problem
-        problem = cp.Problem(cp.Minimize(cost), constraints)
-        problem.solve(solver=cp.OSQP, verbose=False) # solver=cp.OSQP
-
-        # We return the MPC input
-        return x.value

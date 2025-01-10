@@ -36,7 +36,7 @@ class BaseAviary(gym.Env):
                 gui=False,
                 record=False,
                 obstacles=False,
-                user_debug_gui=True,
+                user_debug_gui=False,
                 vision_attributes=False,
                 output_folder='results',
                 world_size=np.array([3,3,1]),
@@ -170,7 +170,7 @@ class BaseAviary(gym.Env):
         #### Connect to PyBullet ###################################
         if self.GUI:
             #### With debug GUI ########################################
-            self.CLIENT = p.connect(p.GUI) # p.connect(p.GUI, options="--opengl2")
+            self.CLIENT = p.connect(p.GUI, options="--verbose=0") # p.connect(p.GUI, options="--opengl2")
             for i in [p.COV_ENABLE_RGB_BUFFER_PREVIEW, p.COV_ENABLE_DEPTH_BUFFER_PREVIEW, p.COV_ENABLE_SEGMENTATION_MARK_PREVIEW]:
                 p.configureDebugVisualizer(i, 0, physicsClientId=self.CLIENT)
             p.resetDebugVisualizerCamera(cameraDistance=3,
@@ -180,8 +180,8 @@ class BaseAviary(gym.Env):
                                          physicsClientId=self.CLIENT
                                          )
             ret = p.getDebugVisualizerCamera(physicsClientId=self.CLIENT)
-            print("viewMatrix", ret[2])
-            print("projectionMatrix", ret[3])
+            #print("viewMatrix", ret[2])
+            #print("projectionMatrix", ret[3])
             if self.USER_DEBUG:
                 #### Add input sliders to the GUI ##########################
                 self.SLIDERS = -1*np.ones(4)
@@ -438,17 +438,17 @@ class BaseAviary(gym.Env):
 
         """
         if self.first_render_call and not self.GUI:
-            print("[WARNING] BaseAviary.render() is implemented as text-only, re-initialize the environment using Aviary(gui=True) to use PyBullet's graphical interface")
+            #print("[WARNING] BaseAviary.render() is implemented as text-only, re-initialize the environment using Aviary(gui=True) to use PyBullet's graphical interface")
             self.first_render_call = False
-        print("\n[INFO] BaseAviary.render() ——— it {:04d}".format(self.step_counter),
-              "——— wall-clock time {:.1f}s,".format(time.time()-self.RESET_TIME),
-              "simulation time {:.1f}s@{:d}Hz ({:.2f}x)".format(self.step_counter*self.PYB_TIMESTEP, self.PYB_FREQ, (self.step_counter*self.PYB_TIMESTEP)/(time.time()-self.RESET_TIME)))
-        for i in range (self.NUM_DRONES):
-            print("[INFO] BaseAviary.render() ——— drone {:d}".format(i),
-                  "——— x {:+06.2f}, y {:+06.2f}, z {:+06.2f}".format(self.pos[i, 0], self.pos[i, 1], self.pos[i, 2]),
-                  "——— velocity {:+06.2f}, {:+06.2f}, {:+06.2f}".format(self.vel[i, 0], self.vel[i, 1], self.vel[i, 2]),
-                  "——— roll {:+06.2f}, pitch {:+06.2f}, yaw {:+06.2f}".format(self.rpy[i, 0]*self.RAD2DEG, self.rpy[i, 1]*self.RAD2DEG, self.rpy[i, 2]*self.RAD2DEG),
-                  "——— angular velocity {:+06.4f}, {:+06.4f}, {:+06.4f} ——— ".format(self.ang_v[i, 0], self.ang_v[i, 1], self.ang_v[i, 2]))
+        # print("\n[INFO] BaseAviary.render() ——— it {:04d}".format(self.step_counter),
+        #       "——— wall-clock time {:.1f}s,".format(time.time()-self.RESET_TIME),
+        #       "simulation time {:.1f}s@{:d}Hz ({:.2f}x)".format(self.step_counter*self.PYB_TIMESTEP, self.PYB_FREQ, (self.step_counter*self.PYB_TIMESTEP)/(time.time()-self.RESET_TIME)))
+        # for i in range (self.NUM_DRONES):
+        #     print("[INFO] BaseAviary.render() ——— drone {:d}".format(i),
+        #           "——— x {:+06.2f}, y {:+06.2f}, z {:+06.2f}".format(self.pos[i, 0], self.pos[i, 1], self.pos[i, 2]),
+        #           "——— velocity {:+06.2f}, {:+06.2f}, {:+06.2f}".format(self.vel[i, 0], self.vel[i, 1], self.vel[i, 2]),
+        #           "——— roll {:+06.2f}, pitch {:+06.2f}, yaw {:+06.2f}".format(self.rpy[i, 0]*self.RAD2DEG, self.rpy[i, 1]*self.RAD2DEG, self.rpy[i, 2]*self.RAD2DEG),
+        #           "——— angular velocity {:+06.4f}, {:+06.4f}, {:+06.4f} ——— ".format(self.ang_v[i, 0], self.ang_v[i, 1], self.ang_v[i, 2]))
     
     ################################################################################
 
@@ -1052,9 +1052,9 @@ class BaseAviary(gym.Env):
         self.environment_description.generate_world_description()
     
         self.obstacle_ids = np.zeros(self.environment_description.n_obstacles).astype(int)  # Store references to obstacles in array
-        print("length of environment_description.obstacles:", len(self.environment_description.obstacles))
-        print("Value of n_obstacles:", self.environment_description.n_obstacles)
-        print(self.environment_description.obstacles)
+        # print("length of environment_description.obstacles:", len(self.environment_description.obstacles))
+        # print("Value of n_obstacles:", self.environment_description.n_obstacles)
+        # print(self.environment_description.obstacles)
     
         for i in range(self.environment_description.n_obstacles):
             # Generate an obstacle of specified shape in a random place in the world
@@ -1066,8 +1066,8 @@ class BaseAviary(gym.Env):
                 collision_shape = p.createCollisionShape(p.GEOM_SPHERE,
                                                          radius=current_obstacle.geometric_description["radius"])
             elif current_obstacle.shape == "cuboid":
-                print(current_obstacle.geometric_description["xyz_dims"])
-                print(current_obstacle.shape, "")
+                # print(current_obstacle.geometric_description["xyz_dims"])
+                # print(current_obstacle.shape, "")
                 collision_shape = p.createCollisionShape(p.GEOM_BOX,
                                                          halfExtents=current_obstacle.geometric_description["xyz_dims"])
     
