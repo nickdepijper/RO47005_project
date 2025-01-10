@@ -135,9 +135,10 @@ class SimpleMPC:
             
 
             # Add obstacle costs if there are any filtered obstacles
-            # if len(filtered_obstacles) > 0:  # Check if there are close obstacles
-            #    obstacle_cost = self.get_obstacle_costs(x[:3, n + 1], filtered_obstacles)
-            #    cost += obstacle_cost
+            # if potential_fields:
+            #     if len(filtered_obstacles) > 0:  # Check if there are close obstacles
+            #     obstacle_cost = self.get_obstacle_costs(x[:3, n + 1], filtered_obstacles)
+            #     cost += obstacle_cost
 
         # Solves the problem
         problem = cp.Problem(cp.Minimize(cost), constraints)
