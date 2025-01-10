@@ -1063,12 +1063,12 @@ class BaseAviary(gym.Env):
             position = current_obstacle.current_position
     
             if current_obstacle.shape == "sphere":
-                collision_shape = p.createVisualShape(p.GEOM_SPHERE,
+                collision_shape = p.createCollisionShape(p.GEOM_SPHERE,
                                                          radius=current_obstacle.geometric_description["radius"])
             elif current_obstacle.shape == "cuboid":
                 # print(current_obstacle.geometric_description["xyz_dims"])
                 # print(current_obstacle.shape, "")
-                collision_shape = p.createVisualShape(p.GEOM_BOX,
+                collision_shape = p.createCollisionShape(p.GEOM_BOX,
                                                          halfExtents=current_obstacle.geometric_description["xyz_dims"])
     
             self.obstacle_ids[i] = p.createMultiBody(

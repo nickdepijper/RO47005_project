@@ -42,10 +42,10 @@ DEFAULT_COLAB = False
 
 # Environment Setup
 WORLD_SIZE=np.array([3,3,1]),
-N_OBSTACLES_STATIC=5
+N_OBSTACLES_STATIC=30
 N_OBSTACLES_DYNAMIC=0
 N_OBSTACLES_FALLING=0
-N_OBSTACLES_PILLAR=0
+N_OBSTACLES_PILLAR=10
 N_OBSTACLES_CUBOID_FLOOR=0
 N_OBSTACLES_CUBOID_CEILING=0
 SPHERE_SIZE_ARRAY=np.array([0.05, 0.1, 0.15])
@@ -53,7 +53,7 @@ CUBOID_SIZE_ARRAY=np.array([0.05, 0.075, 0.1])
 PILLAR_SIZE_ARRAY=np.array([0.05])
 
 # Debug functionality
-DEFAULT_GUI = False
+DEFAULT_GUI = True
 DEFAULT_USER_DEBUG_GUI = False
 MPC_TRAJECTORY = False
 
@@ -157,7 +157,6 @@ def run(
     start_time = time.time()
     average_calc_time = 0
     for i in range(0, int(duration_sec*env.CTRL_FREQ)):
-
         #### Step the simulation ###################################
         obs, reward, terminated, truncated, info = env.step(action)
         #### Remove previous debug lines ##########################
@@ -165,6 +164,16 @@ def run(
             p.removeUserDebugItem(debug_item)
         previous_debug_lines = []
 
+        # Check for collisions
+        for obstacle_id in env.obstacle_ids:
+            drone_id = 1
+            contact_points = p.getContactPoints(bodyA=drone_id, bodyB=obstacle_id)
+            if len(contact_points) > 0:
+                print("Detected object collision")
+                elapsed_time = time.time() - start_time
+                print(f"Drone {j} died after {elapsed_time:.2f} seconds.")
+                env.close()
+                return elapsed_time
         # Visualization code for planner MPC, if it is used
         # if MPC_POINT:
         #     if not used:
