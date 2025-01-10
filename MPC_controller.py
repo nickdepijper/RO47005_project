@@ -103,8 +103,8 @@ class SimpleMPC:
 
 
 
-        A_obs, b_obs=self.convexify(current_state[:3], 0.05, filtered_obstacles)
-        x_intergoal = self.get_intermediate_goal(current_state[:3].flatten(), 0.05 ,target_state[:3].flatten(), A_obs,b_obs).flatten()[0:3]
+        A_obs, b_obs=self.convexify(current_state[:3], 0.07, filtered_obstacles)
+        x_intergoal = self.get_intermediate_goal(current_state[:3].flatten(), 0.07 ,target_state[:3].flatten(), A_obs,b_obs).flatten()[0:3]
         target_state = np.hstack([x_intergoal,target_state[3:]])
 
         print(x_intergoal)
@@ -243,7 +243,7 @@ class SimpleMPC:
 
         
         # Calculate the plane constant b
-        b = -np.dot(normal, point)
+        b = np.dot(normal, point)
         
         # For CVXPY, A is just the normal vector (1x3) and b is a scalar
         A = normal #.reshape(1, -1)  # Reshape to 1x3 for CVXPY compatibility
