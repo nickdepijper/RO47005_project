@@ -104,7 +104,7 @@ class SimpleMPC:
 
 
         A_obs, b_obs=self.convexify(current_state[:3], 0.05, filtered_obstacles)
-        x_intergoal = self.get_intermediate_goal(current_state[:3].flatten(), 0.005 ,target_state[:3].flatten(), A_obs,b_obs).flatten()[0:3]
+        x_intergoal = self.get_intermediate_goal(current_state[:3].flatten(), 0.05 ,target_state[:3].flatten(), A_obs,b_obs).flatten()[0:3]
         target_state = np.hstack([x_intergoal,target_state[3:]])
 
         print(x_intergoal)
@@ -267,8 +267,8 @@ class SimpleMPC:
 
     def get_intermediate_goal(self, pos,r_drone, goal_pos, A, b):
         if len(A) > 0:
-            new_b=self.get_new_constraints(pos,r_drone, goal_pos, A,b)
-
+            #new_b=self.get_new_constraints(pos,r_drone, goal_pos, A,b)
+            new_b=b
             cost = 0.
             constraints = []
 
@@ -280,6 +280,8 @@ class SimpleMPC:
             #print("new_b is this", np.shape(b[:,np.newaxis]))
             #print("new_A is this", np.shape((A[:,:]@x)))
             constraints+=[A@x<=new_b[:,np.newaxis]]
+
+            constraints+=[x[2] >= 0]
 
             #Cost is distance to goal
             cost+=cp.sum_squares(x-goal_pos[:,np.newaxis])
@@ -330,7 +332,7 @@ class DSLMPCControl(BaseControl):
                                     ])
 
         # Initialize MPC
-        self.mpc = SimpleMPC(horizon=50, timestep=1/60, m=0.027, g=g, Ixx=1.4e-5, Iyy=1.4e-5, Izz=2.17e-5, obstacles=obstacles)
+        self.mpc = SimpleMPC(horizon=20, timestep=1/60, m=0.027, g=g, Ixx=1.4e-5, Iyy=1.4e-5, Izz=2.17e-5, obstacles=obstacles)
 
     def computeControl(self,
                        control_timestep,
