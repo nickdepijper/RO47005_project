@@ -159,7 +159,6 @@ def run(
     total_calc_time = 0
     calc_count = 0
     for i in range(0, int(duration_sec*env.CTRL_FREQ)):
-
         #### Step the simulation ###################################
         obs, reward, terminated, truncated, info = env.step(action)
         #### Remove previous debug lines ##########################
@@ -167,6 +166,16 @@ def run(
             p.removeUserDebugItem(debug_item)
         previous_debug_lines = []
 
+        # Check for collisions
+        for obstacle_id in env.obstacle_ids:
+            drone_id = 1
+            contact_points = p.getContactPoints(bodyA=drone_id, bodyB=obstacle_id)
+            if len(contact_points) > 0:
+                print("Detected object collision")
+                elapsed_time = time.time() - start_time
+                print(f"Drone {j} died after {elapsed_time:.2f} seconds.")
+                env.close()
+                return elapsed_time
         # Visualization code for planner MPC, if it is used
         # if MPC_POINT:
         #     if not used:
