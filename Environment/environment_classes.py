@@ -171,7 +171,7 @@ class ObstacleDescription:
 
     shape : string
         Supported shapes: sphere, cuboid
-    path_description : PathDescription
+    path_description : PathDescription  
         Contains info on path to be followed
     sphere_size_array : np.array(int)
         A list of sphere radii randomly sampled from during generation
