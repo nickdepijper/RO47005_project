@@ -42,10 +42,10 @@ DEFAULT_COLAB = False
 
 # Environment Setup
 WORLD_SIZE=np.array([3,3,1]),
-N_OBSTACLES_STATIC=0
+N_OBSTACLES_STATIC=30
 N_OBSTACLES_DYNAMIC=0
 N_OBSTACLES_FALLING=0
-N_OBSTACLES_PILLAR=3
+N_OBSTACLES_PILLAR=0
 N_OBSTACLES_CUBOID_FLOOR=5
 N_OBSTACLES_CUBOID_CEILING=5
 SPHERE_SIZE_ARRAY=np.array([0.05, 0.1, 0.15])
@@ -53,7 +53,7 @@ CUBOID_SIZE_ARRAY=np.array([0.05, 0.075, 0.1])
 PILLAR_SIZE_ARRAY=np.array([0.05])
 
 # Debug functionality
-DEFAULT_GUI = False
+DEFAULT_GUI = True
 DEFAULT_USER_DEBUG_GUI = False
 MPC_TRAJECTORY = False
 
@@ -156,6 +156,8 @@ def run(
     used = False
     start_time = time.time()
     average_calc_time = 0
+    total_calc_time = 0
+    calc_count = 0
     for i in range(0, int(duration_sec*env.CTRL_FREQ)):
 
         #### Step the simulation ###################################
@@ -192,6 +194,8 @@ def run(
             if distance_to_goal < 0.1:  # Drone reached the goal
                 elapsed_time = time.time() - start_time
                 print(f"Drone {j} reached the goal in {elapsed_time:.2f} seconds.")
+                average_calc_time = total_calc_time / calc_count
+                print(f"Average control calculation time: {average_calc_time:.4f} seconds")
                 env.close()
                 return elapsed_time
             
@@ -211,7 +215,8 @@ def run(
                                                                         target_vel=TARGET_STATE[3:]
                                                                         )
             calc_end = time.time()
-            average_calc_time += (calc_end - calc_start) / int(duration_sec*env.CTRL_FREQ)
+            total_calc_time += (calc_end - calc_start)
+            calc_count += 1
 
             
             
@@ -255,15 +260,17 @@ def run(
 
         #### Printout ##############################################
         env.render()
-
-        #### Sync the simulation ###################################
+        
         if gui:
             sync(i, START, env.CTRL_TIMESTEP)
+        
+    
 
     #### Close the environment #################################
-    print(f"Average control calculation time: {average_calc_time:.4f} seconds")
+   
     env.close()
-
+    average_calc_time = total_calc_time / calc_count if calc_count > 0 else 0
+    print(f"Average control calculation time: {average_calc_time:.4f} seconds")
     #### Save the simulation results ###########################
     logger.save()
     logger.save_as_csv("mpc") # Optional CSV save
