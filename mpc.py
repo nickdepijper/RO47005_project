@@ -88,6 +88,7 @@ class SimpleMPC:
         Q = np.diag([50, 50, 30, 10, 10, 10, 5, 5, 10, 1, 1, 1])  # High weight on position/orientation
         R = 0.1 * np.eye(4)  # Lower weight on control effort
         filtered_obstacles = []
+        filtered_obstacles_position = []
         # Filter obstacles based on distance to the drone
         for obs in self.static_obstacles:
             # Calculate distance
@@ -97,13 +98,14 @@ class SimpleMPC:
             
             # Check if the obstacle is within range
             if distance < 1:
-                filtered_obstacles.append(obstacle_position)
+                filtered_obstacles_position.append(obstacle_position)
+                filtered_obstacles.append(obs)
 
 
 
-        A_obs, b_obs=self.convexify(current_state[:3], 0.07, filtered_obstacles)
-        x_intergoal = self.get_intermediate_goal(current_state[:3].flatten(), 0.07 ,target_state[:3].flatten(), A_obs,b_obs).flatten()[0:3]
-        target_state = np.hstack([x_intergoal,target_state[3:]])
+        #A_obs, b_obs=self.convexify(current_state[:3], 0.07, filtered_obstacles)
+        #x_intergoal = self.get_intermediate_goal(current_state[:3].flatten(), 0.07 ,target_state[:3].flatten(), A_obs,b_obs).flatten()[0:3]
+        #target_state = np.hstack([x_intergoal,target_state[3:]])
 
         #print(x_intergoal)
 
@@ -133,9 +135,9 @@ class SimpleMPC:
             
 
             # Add obstacle costs if there are any filtered obstacles
-            #if len(filtered_obstacles) > 0:  # Check if there are close obstacles
-            #    obstacle_cost = self.get_obstacle_costs(x[:3, n + 1], filtered_obstacles)
-            #    cost += obstacle_cost
+            if len(filtered_obstacles) > 0:  # Check if there are close obstacles
+               obstacle_cost = self.get_obstacle_costs(x[:3, n + 1], filtered_obstacles)
+               cost += obstacle_cost
 
         # Solves the problem
         problem = cp.Problem(cp.Minimize(cost), constraints)
