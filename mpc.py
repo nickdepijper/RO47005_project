@@ -70,10 +70,8 @@ class SimpleMPC:
         self.D = self.D_c
 
 
-    def compute_control(self, current_state, target_state):
+    def compute_control(self, current_state, target_state, obstacle_avoidance=True):
            # Weight on the input
-
-
         cost = 0.
         constraints = []
 
@@ -87,57 +85,30 @@ class SimpleMPC:
         u_target=np.array([self.m*9.81/4,self.m*9.81/4,self.m*9.81/4,self.m*9.81/4])
         Q = np.diag([50, 50, 30, 10, 10, 10, 5, 5, 10, 1, 1, 1])  # High weight on position/orientation
         R = 0.1 * np.eye(4)  # Lower weight on control effort
-        filtered_obstacles = []
-        filtered_obstacles_position = []
-        # Filter obstacles based on distance to the drone
-        for obs in self.static_obstacles:
-            # Calculate distance
-            obstacle_position = obs.path[0]  # Ensure this gives a 3D position
-            drone_position = current_state[:3]  # Drone's current 3D position
-            distance = np.linalg.norm(obstacle_position - drone_position)
-            
-            # Check if the obstacle is within range
-            if distance < 1:
-                filtered_obstacles_position.append(obstacle_position)
-                filtered_obstacles.append(obs)
+        if obstacle_avoidance:
+            filtered_obstacles = []
+            filtered_obstacles_position = []
+            # Filter obstacles based on distance to the drone
+            for obs in self.static_obstacles:
+                # Calculate distance
+                obstacle_position = obs.path[0]  # Ensure this gives a 3D position
+                drone_position = current_state[:3]  # Drone's current 3D position
+                distance = np.linalg.norm(obstacle_position - drone_position)
+                
+                # Check if the obstacle is within range
+                if distance < 1:
+                    filtered_obstacles_position.append(obstacle_position)
+                    filtered_obstacles.append(obs)
 
 
 
-        A_obs, b_obs=self.convexify(current_state[:3], 0.07, filtered_obstacles_position)
-        x_intergoal = self.get_intermediate_goal(current_state[:3].flatten(), 0.07 ,target_state[:3].flatten(), A_obs,b_obs).flatten()[0:3]
-        target_state = np.hstack([x_intergoal,target_state[3:]])
-
-        #print(x_intergoal)
-
-        #Obstacle avoidance
-        #print("A_obstacle is this: " , A_obs, "     ", b_obs)
+            A_obs, b_obs=self.convexify(current_state[:3], 0.07, filtered_obstacles_position)
+            x_intergoal = self.get_intermediate_goal(current_state[:3].flatten(), 0.07 ,target_state[:3].flatten(), A_obs,b_obs).flatten()[0:3]
+            target_state = np.hstack([x_intergoal,target_state[3:]])
 
         for n in range(self.horizon):
             cost += (cp.quad_form((x[:,n+1]-target_state),Q)  + cp.quad_form(u[:,n]-u_target, R))
             constraints += [x[:,n+1] == self.A @ x[:,n] + self.B @ u[:,n]]
-            # State and input constraints
-            # constraints += [x[6, n + 1] <= 0.6]
-            # constraints += [x[7, n + 1] <= 0.6]
-            # constraints += [x[8, n + 1] <= 0.3]
-            # constraints += [x[6, n + 1] >= -0.6]
-            # constraints += [x[7, n + 1] >= -0.6]
-            # constraints += [x[8, n + 1] >= -0.3]
-
-            # constraints += [u[:, n] >= -0.07 * 30]
-            # constraints += [u[:, n] <= 0.07 * 30]
-            #Obstacle avoidance
-            #print("A_obstackle is this: " , (A_obs @ x[:3,n]), "     ", b_obs.flatten())
-            #if len(A_obs) > 0:
-                  #constraints += [A_obs @ x[:3,n] <= b_obs.flatten()]
-            #print(self.static_obstacles)
-
-
-            
-
-            # Add obstacle costs if there are any filtered obstacles
-            # if len(filtered_obstacles) > 0:  # Check if there are close obstacles
-            #    obstacle_cost = self.get_obstacle_costs(x[:3, n + 1], filtered_obstacles)
-            #    cost += obstacle_cost
 
         # Solves the problem
         problem = cp.Problem(cp.Minimize(cost), constraints)
@@ -151,9 +122,6 @@ class SimpleMPC:
         dynamic_obstacles = []
 
         for obstacle in obstacles:
-            # print(f"Obstacle path: {obstacle.path}")
-            # print(f"Current pos: {obstacle.current_position}")
-            # print(f"Dimensions: {obstacle.geometric_description['xyz_dims']}")
             if len(obstacle.path) == 1:
                 static_obstacles.append(obstacle)
             elif len(obstacle.path) > 1:
@@ -334,14 +302,15 @@ class DSLMPCControl(BaseControl):
                        target_pos,
                        target_rpy=np.zeros(3),
                        target_vel=np.zeros(3),
-                       target_rpy_rates=np.zeros(3)
+                       target_rpy_rates=np.zeros(3),
+                       obstacle_avoidance=True
                        ):
         current_state = np.hstack((cur_pos, cur_vel, p.getEulerFromQuaternion(cur_quat), cur_ang_vel))
         target_state = np.hstack((target_pos, target_vel, target_rpy, target_rpy_rates))
         #target_state = np.hstack(([0,0,5], target_rpy, target_vel, target_rpy_rates))
 
         # Compute MPC control inputs
-        thrusts, path = self.mpc.compute_control(current_state, target_state)
+        thrusts, path = self.mpc.compute_control(current_state, target_state, obstacle_avoidance=obstacle_avoidance)
         #thrusts = np.clip(thrusts, 0, self.MAX_PWM / self.PWM2RPM_SCALE)
         rpms = []
         

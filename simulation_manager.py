@@ -15,7 +15,6 @@ The drone navigates an environment with random obstacles from a start to an end 
 
 """
 
-import os
 import time
 import argparse
 import numpy as np
@@ -42,10 +41,10 @@ DEFAULT_COLAB = False
 
 # Environment Setup
 WORLD_SIZE=np.array([3,3,1]),
-N_OBSTACLES_STATIC=30
+N_OBSTACLES_STATIC=25
 N_OBSTACLES_DYNAMIC=0
 N_OBSTACLES_FALLING=0
-N_OBSTACLES_PILLAR=10
+N_OBSTACLES_PILLAR=0
 N_OBSTACLES_CUBOID_FLOOR=0
 N_OBSTACLES_CUBOID_CEILING=0
 SPHERE_SIZE_ARRAY=np.array([0.05, 0.1, 0.15])
@@ -53,13 +52,13 @@ CUBOID_SIZE_ARRAY=np.array([0.05, 0.075, 0.1])
 PILLAR_SIZE_ARRAY=np.array([0.05])
 
 # Debug functionality
-DEFAULT_GUI = True
+DEFAULT_GUI = False
 DEFAULT_USER_DEBUG_GUI = False
 MPC_TRAJECTORY = False
 
-# MPC Control Options
-MPC_POINT = False # MPC with point mass dynamics model
-MPC_DRONE = True # MPC Controller with drone dynamics model
+# Automated Test Setups
+N_OBSTACLE_PROGRESSION = [50,75,100]
+N_RUNS = 50
 
 def run(
         drone=DEFAULT_DRONES,
@@ -84,7 +83,8 @@ def run(
         n_obstacles_cuboid_ceiling=N_OBSTACLES_CUBOID_CEILING,
         sphere_size_array=SPHERE_SIZE_ARRAY,
         cuboid_size_array=CUBOID_SIZE_ARRAY,
-        pillar_size_array=PILLAR_SIZE_ARRAY
+        pillar_size_array=PILLAR_SIZE_ARRAY,
+        obstacle_avoidance_mode=True
         ):
     #### Initialize the simulation #############################
     H = .1
@@ -142,20 +142,19 @@ def run(
                     )
 
     #### Initialize the controllers ############################
-    if MPC_DRONE:
-        ctrl_MPC = DSLMPCControl(drone_model=drone, horizon=40, timestep=1/60, obstacles=env.environment_description.obstacles)
-    
-    # if MPC_POINT:
-    #     planner_MPC = MPCPlanner(horizon=20, timestep=1, m=0.027, g=9.81)
+    ctrl_MPC = DSLMPCControl(drone_model=drone, horizon=40, timestep=1/60, obstacles=env.environment_description.obstacles)
 
     previous_debug_lines = []
 
     #### Run the simulation ####################################
     action = np.zeros((num_drones,4))
     START = time.time()
-    used = False
     start_time = time.time()
-    average_calc_time = 0
+    
+    average_computation_time = 0
+    collision = None
+    goal_reached = None
+    
     for i in range(0, int(duration_sec*env.CTRL_FREQ)):
         #### Step the simulation ###################################
         obs, reward, terminated, truncated, info = env.step(action)
@@ -164,104 +163,48 @@ def run(
             p.removeUserDebugItem(debug_item)
         previous_debug_lines = []
 
+        #### Collision & Success Checks ###############
+
         # Check for collisions
         for obstacle_id in env.obstacle_ids:
             drone_id = 1
             contact_points = p.getContactPoints(bodyA=drone_id, bodyB=obstacle_id)
             if len(contact_points) > 0:
+                collision = True
+                goal_reached = False
                 print("Detected object collision")
                 elapsed_time = time.time() - start_time
-                print(f"Drone {j} died after {elapsed_time:.2f} seconds.")
+                print(f"Drone crashed after {elapsed_time:.2f} seconds.")
                 env.close()
-                p.disconnect()
-                return elapsed_time
-        # Visualization code for planner MPC, if it is used
-        # if MPC_POINT:
-        #     if not used:
-        #         used = True
-        #         dots = planner_MPC.compute_control(current_state_planner=obs[0], target_state=TARGET_STATE)
-        #         dots = dots.T
-        #         for dot_coords in dots:
-        #             id = p.createVisualShape(p.GEOM_SPHERE,
-        #                                             radius=0.02,
-        #                                             visualFramePosition=[0, 0, 0],
-        #                                             rgbaColor=[0, 1, 0, 0.5],
-        #                                             )
-        #             p.createMultiBody(
-        #                 baseMass=0,  # Setting mass to 0 disables physics (but not collisions)
-        #                 baseVisualShapeIndex=id,
-        #                 basePosition=dot_coords[:3],
-        #                 baseOrientation=p.getQuaternionFromEuler([0, 0, 0]),
-        #                 physicsClientId=env.CLIENT
-        #                     )
+                return elapsed_time, average_computation_time, collision, goal_reached
 
-        #### Compute control for the current way point ############# 
-        
+        # Check if goal has been reached 
         for j in range(num_drones):
             distance_to_goal = np.linalg.norm(obs[j][:3] - TARGET_POS)
             if distance_to_goal < 0.1:  # Drone reached the goal
                 elapsed_time = time.time() - start_time
-                print(f"Drone {j} reached the goal in {elapsed_time:.2f} seconds.")
+                collision = False
+                goal_reached = True
+                print(f"Drone reached the goal in {elapsed_time:.2f} seconds.")
                 env.close()
-                return elapsed_time
+                return elapsed_time, average_computation_time, collision, goal_reached
             
             calc_start = time.time() 
-
-            # if MPC_POINT:
-            #     particle_state_traj = planner_MPC.compute_control(current_state_planner=obs[j],
-            #                                     target_state=TARGET_STATE)
-            #     target_from_planner_pos = particle_state_traj.T[2, :3]
-            #     target_from_planner_vel = particle_state_traj.T[2, 3:]
             
-            if MPC_DRONE:
-                action[j, :], pos_error, _, path = ctrl_MPC.computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
-                                                                        state=obs[j],
-                                                                        target_pos=TARGET_STATE[0:3],
-                                                                        target_rpy=INIT_RPYS[j, :],
-                                                                        target_vel=TARGET_STATE[3:]
-                                                                        )
+            # Compute Control
+            action[j, :], pos_error, _, path = ctrl_MPC.computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
+                                                                    state=obs[j],
+                                                                    target_pos=TARGET_STATE[0:3],
+                                                                    target_rpy=INIT_RPYS[j, :],
+                                                                    target_vel=TARGET_STATE[3:],
+                                                                    obstacle_avoidance=obstacle_avoidance_mode
+                                                                    )
             calc_end = time.time()
-            average_calc_time += (calc_end - calc_start) / int(duration_sec*env.CTRL_FREQ)
+            average_computation_time += (calc_end - calc_start) / int(duration_sec*env.CTRL_FREQ)
 
             
             
             env._showDroneLocalAxes(j)
-        # Extract target position for visualization
-        # target_pos = target_pos=INIT_XYZS[j, :] + TARGET_POS[wp_counters[j], :]   
-        
-        if MPC_TRAJECTORY:
-        # Draw MPC path as a line 
-            for idx in range(len(path.T) - 1):
-                line_id = p.addUserDebugLine(
-                    lineFromXYZ=path.T[idx],
-                    lineToXYZ=path.T[idx + 1],
-                    lineColorRGB=[1, 0, 0],  # Red line
-                    lineWidth=1.5
-                )
-                previous_debug_lines.append(line_id)
-            
-            # Draw line to target position
-            current_pos = obs[j][:3]  # Drone's current position (x, y, z)
-            target_line_id = p.addUserDebugLine(
-                lineFromXYZ=current_pos,
-                lineToXYZ=TARGET_POS,
-                lineColorRGB=[0, 1, 0],  # Green line
-                lineWidth=3
-            )
-            previous_debug_lines.append(target_line_id)
-
-        #### Go to the next way point and loop #####################
-        # for j in range(num_drones):
-        #     wp_counters[j] = wp_counters[j] + 1 if wp_counters[j] < (NUM_WP-1) else 0
-
-        #### Log the simulation ####################################
-        # for j in range(num_drones):
-        #     logger.log(drone=j,
-        #                timestamp=i/env.CTRL_FREQ,
-        #                state=obs[j],
-        #                control=np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2], INIT_RPYS[j, :], np.zeros(6)])
-        #                #control=np.hstack([INIT_XYZS[j, :]+TARGET_POS[wp_counters[j], :], INIT_RPYS[j, :], np.zeros(6)])
-        #                )
 
         #### Printout ##############################################
         env.render()
@@ -271,50 +214,37 @@ def run(
             sync(i, START, env.CTRL_TIMESTEP)
 
     #### Close the environment #################################
-    print(f"Average control calculation time: {average_calc_time:.4f} seconds")
+    collision = False
+    goal_reached = False
+    elapsed_time = time.time() - start_time
+    print(f"Drone has failed to reach the goal in {elapsed_time:.2f} seconds.")
     env.close()
-
-    #### Save the simulation results ###########################
-
-    #### Plot the simulation results ###########################
-    if plot:
-        logger.plot()
-    
-    p.disconnect()
-    return time.time() - start_time
+    return elapsed_time, average_computation_time, collision, goal_reached
 
 
 if __name__ == "__main__":
-    #### Define and parse (optional) arguments for the script ##
-    parser = argparse.ArgumentParser(description='Simulation script using CtrlAviary and MPC Control & Planner')
-    parser.add_argument('--drone',              default=DEFAULT_DRONES,                 type=DroneModel,    help='Drone model (default: CF2X)', metavar='', choices=DroneModel)
-    parser.add_argument('--num_drones',         default=DEFAULT_NUM_DRONES,             type=int,           help='Number of drones (default: 3)', metavar='')
-    parser.add_argument('--physics',            default=DEFAULT_PHYSICS,                type=Physics,       help='Physics updates (default: PYB)', metavar='', choices=Physics)
-    parser.add_argument('--gui',                default=DEFAULT_GUI,                    type=str2bool,      help='Whether to use PyBullet GUI (default: True)', metavar='')
-    parser.add_argument('--record_video',       default=DEFAULT_RECORD_VISION,          type=str2bool,      help='Whether to record a video (default: False)', metavar='')
-    parser.add_argument('--plot',               default=DEFAULT_PLOT,                   type=str2bool,      help='Whether to plot the simulation results (default: True)', metavar='')
-    parser.add_argument('--user_debug_gui',     default=DEFAULT_USER_DEBUG_GUI,         type=str2bool,      help='Whether to add debug lines and parameters to the GUI (default: False)', metavar='')
-    parser.add_argument('--obstacles',          default=DEFAULT_OBSTACLES,              type=str2bool,      help='Whether to add obstacles to the environment (default: True)', metavar='')
-    parser.add_argument('--simulation_freq_hz', default=DEFAULT_SIMULATION_FREQ_HZ,     type=int,           help='Simulation frequency in Hz (default: 240)', metavar='')
-    parser.add_argument('--control_freq_hz',    default=DEFAULT_CONTROL_FREQ_HZ,        type=int,           help='Control frequency in Hz (default: 48)', metavar='')
-    parser.add_argument('--duration_sec',       default=DEFAULT_DURATION_SEC,           type=int,           help='Duration of the simulation in seconds (default: 5)', metavar='')
-    parser.add_argument('--output_folder',      default=DEFAULT_OUTPUT_FOLDER,          type=str,           help='Folder where to save logs (default: "results")', metavar='')
-    parser.add_argument('--colab',              default=DEFAULT_COLAB,                  type=bool,          help='Whether example is being run by a notebook (default: "False")', metavar='')
-    parser.add_argument('--max_runs',           default=5,                              type=int,           help='Maximum number of simulation runs', metavar='')
-    ARGS = parser.parse_args()
-
-    #### Exclude `max_runs` from `ARGS` ####
-    run_args = vars(ARGS).copy()
-    run_args.pop('max_runs')
-
-    #### Run multiple simulations ####
-    for run_index in range(ARGS.max_runs):
-        print(f"Starting run {run_index + 1} / {ARGS.max_runs}")
-        try:
-            elapsed_time = run(**run_args)  # Pass filtered arguments
-            print(f"Run {run_index + 1} completed in {elapsed_time:.2f} seconds.\n")
-        except Exception as e:
-            print(f"Run {run_index + 1} failed with error: {e}")
+    with open("results.txt", "a") as file:
+        file.write("\n")
+        file.write(f"New run with {N_OBSTACLES_STATIC} obstacles")
+        file.write("\n")
+        header = ["Elapsed_time", "Average_computation_time", "Collision", "Goal_reached", "Obstacle Avoidance"]
+        file.write(",".join(map(str, header)) + "\n")
+    for n_obstacles_static in N_OBSTACLE_PROGRESSION:
+        print(f"Running test series with {n_obstacles_static} obstacles")
+        for obstacle_avoidance_mode in [True, False]:
+            for run_index in range(N_RUNS):
+                print(f"Starting run {run_index + 1} / {N_RUNS}")
+                try:
+                    elapsed_time, average_computation_time, collision, goal_reached = run(n_obstacles_static=n_obstacles_static)  # Pass filtered arguments
+                except Exception as e:
+                    print(f"Run {run_index + 1} failed with error: {e}")
+                    collision = True
+                
+                with open("results.txt", "a") as file:
+                    data = [round(elapsed_time,3), round(average_computation_time,5), collision, goal_reached, obstacle_avoidance_mode]
+                    file.write(",".join(map(str, data)) + "\n")
+                print("Data of run saved to results.txt")
+        
 
     print("All runs completed.")
 
