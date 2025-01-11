@@ -57,7 +57,7 @@ DEFAULT_USER_DEBUG_GUI = False
 MPC_TRAJECTORY = False
 
 # Automated Test Setups
-N_OBSTACLE_PROGRESSION = [50,75,100]
+N_OBSTACLE_PROGRESSION = [25, 50, 75, 100]
 N_RUNS = 50
 
 def run(
@@ -223,19 +223,19 @@ def run(
 
 
 if __name__ == "__main__":
-    with open("results.txt", "a") as file:
-        file.write("\n")
-        file.write(f"New run with {N_OBSTACLES_STATIC} obstacles")
-        file.write("\n")
-        header = ["Elapsed_time", "Average_computation_time", "Collision", "Goal_reached", "Obstacle Avoidance"]
-        file.write(",".join(map(str, header)) + "\n")
     for n_obstacles_static in N_OBSTACLE_PROGRESSION:
         print(f"Running test series with {n_obstacles_static} obstacles")
-        for obstacle_avoidance_mode in [True, False]:
+        for obstacle_avoidance_mode in [True,False]:
+            with open("results.txt", "a") as file:
+                file.write("\n")
+                file.write(f"New run with {n_obstacles_static} obstacles and {obstacle_avoidance_mode} Obstacle Avoidance")
+                file.write("\n")
+                header = ["Elapsed_time", "Average_computation_time", "Collision", "Goal_reached", "Obstacle Avoidance"]
+                file.write(",".join(map(str, header)) + "\n")
             for run_index in range(N_RUNS):
                 print(f"Starting run {run_index + 1} / {N_RUNS}")
                 try:
-                    elapsed_time, average_computation_time, collision, goal_reached = run(n_obstacles_static=n_obstacles_static)  # Pass filtered arguments
+                    elapsed_time, average_computation_time, collision, goal_reached = run(n_obstacles_static=n_obstacles_static, obstacle_avoidance_mode=obstacle_avoidance_mode)  # Pass filtered arguments
                 except Exception as e:
                     print(f"Run {run_index + 1} failed with error: {e}")
                     collision = True
