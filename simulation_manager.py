@@ -53,7 +53,7 @@ CUBOID_SIZE_ARRAY=np.array([0.05, 0.075, 0.1])
 PILLAR_SIZE_ARRAY=np.array([0.05])
 
 # Debug functionality
-DEFAULT_GUI = True
+DEFAULT_GUI = False
 DEFAULT_USER_DEBUG_GUI = False
 MPC_TRAJECTORY = False
 
@@ -173,7 +173,7 @@ def run(
             if len(contact_points) > 0:
                 print("Detected object collision")
                 elapsed_time = time.time() - start_time
-                print(f"Drone {j} died after {elapsed_time:.2f} seconds.")
+                print(f"Drone died after {elapsed_time:.2f} seconds.")
                 env.close()
                 return elapsed_time
         # Visualization code for planner MPC, if it is used
@@ -202,7 +202,7 @@ def run(
             distance_to_goal = np.linalg.norm(obs[j][:3] - TARGET_POS)
             if distance_to_goal < 0.1:  # Drone reached the goal
                 elapsed_time = time.time() - start_time
-                print(f"Drone {j} reached the goal in {elapsed_time:.2f} seconds.")
+                print(f"Drone reached the goal in {elapsed_time:.2f} seconds.")
                 average_calc_time = total_calc_time / calc_count
                 print(f"Average control calculation time: {average_calc_time:.4f} seconds")
                 env.close()
