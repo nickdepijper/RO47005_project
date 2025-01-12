@@ -1,7 +1,10 @@
 """Script demonstrating the joint use of simulation and control.
 
 The simulation is run by a customized 'CtrlAviary` environment.
-The control is given by the MPC Controller and Planner Implementation in MPC_controller & Planner
+The control is given by the MPC Controller and Planner Implementation in MPC_controller & Planner.
+
+The file is based on examples/pid.py, from the gym-pybullet-drones repository
+https://github.com/utiasDSL/gym-pybullet-drones
 
 Example
 -------
@@ -52,7 +55,7 @@ CUBOID_SIZE_ARRAY=np.array([0.05, 0.075, 0.1])
 PILLAR_SIZE_ARRAY=np.array([0.05])
 
 # Debug functionality
-DEFAULT_GUI = False
+DEFAULT_GUI = True
 DEFAULT_USER_DEBUG_GUI = False
 MPC_TRAJECTORY = False
 
