@@ -1,0 +1,3 @@
+
+New run with 25 obstacles and True Obstacle Avoidance
+Elapsed_time,Average_computation_time,Collision,Goal_reached,Obstacle Avoidance
