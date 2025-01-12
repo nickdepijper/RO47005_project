@@ -11,7 +11,7 @@ This README file focuses on guiding the user through the installation and runnin
 ## Installation
 The simulation environment is based on the gym-pybullet-drones environment https://github.com/utiasDSL/gym-pybullet-drones
 
-This installation guide assumes, that the user is on Linux, has the RO47005_project repository available and has navigated into the base of it with your terminal. 
+This installation guide assumes, that the user is on Linux, has the RO47005_project repository available and has navigated into the base of it with the terminal. 
 
 The first part of the installation process is analogous to that of the gym-pybullet-drones repository, and is thus copied here:
 ```bash
