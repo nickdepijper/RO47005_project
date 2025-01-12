@@ -1,3 +1,10 @@
+"""
+This file is largely from the gym-pybullet-drones repository, and was only extended in a few places to
+enable customization of the environment via the classes defined in environment_classes.py.
+"""
+
+
+
 import os
 from sys import platform
 import time

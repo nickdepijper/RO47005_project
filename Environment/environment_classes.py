@@ -1,8 +1,9 @@
-import numpy as np
+"""
+This file includes the object and world description classes, that are used to generate the environment 
+"""
 
-# todo: Add type hints
-# todo: Generate 'safe zone' for drone spawning
-# todo: Add collision checks for object generation
+
+import numpy as np
 
 class WorldDescription:
     """
